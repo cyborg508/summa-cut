@@ -60,33 +60,53 @@ def _centered_clip_rect_pt(
     return fitz.Rect(x0, y0, x1, y1)
 
 
+class _SourceCache:
+    """Otwiera każdy plik źródłowy najwyżej raz w obrębie jednego eksportu.
+
+    Dawniej `_place_pdf_page` wołało `fitz.open()` per placement, co przy setkach
+    użytków dawało setki otwarć tego samego PDF-a — główne wąskie gardło podglądu
+    (np. 117 użytków = 236 otwarć ≈ 6,4 s). Teraz otwieramy raz i reużywamy.
+    """
+
+    def __init__(self) -> None:
+        self._docs: dict[str, fitz.Document] = {}
+
+    def get(self, path: str) -> fitz.Document:
+        doc = self._docs.get(path)
+        if doc is None:
+            doc = fitz.open(path)
+            self._docs[path] = doc
+        return doc
+
+    def close(self) -> None:
+        for doc in self._docs.values():
+            doc.close()
+        self._docs.clear()
+
+
 def _place_pdf_page(
     target_page: fitz.Page,
-    source_path: str,
+    src: fitz.Document,
     source_page_index: int,
     content_bbox_pt: tuple[float, float, float, float],
     placement: Placement,
     use_full_page: bool = False,
 ) -> None:
-    src = fitz.open(source_path)
-    try:
-        src_page = src[source_page_index]
-        clip_rect = src_page.rect if use_full_page else _centered_clip_rect_pt(
-            src_page.rect,
-            content_bbox_pt,
-            placement.width_mm,
-            placement.height_mm,
-            placement.rotation_deg,
-        )
-        rect = _rect_mm_to_pt(
-            placement.x_mm,
-            placement.y_mm,
-            placement.width_mm,
-            placement.height_mm,
-        )
-        target_page.show_pdf_page(rect, src, source_page_index, rotate=placement.rotation_deg, clip=clip_rect)
-    finally:
-        src.close()
+    src_page = src[source_page_index]
+    clip_rect = src_page.rect if use_full_page else _centered_clip_rect_pt(
+        src_page.rect,
+        content_bbox_pt,
+        placement.width_mm,
+        placement.height_mm,
+        placement.rotation_deg,
+    )
+    rect = _rect_mm_to_pt(
+        placement.x_mm,
+        placement.y_mm,
+        placement.width_mm,
+        placement.height_mm,
+    )
+    target_page.show_pdf_page(rect, src, source_page_index, rotate=placement.rotation_deg, clip=clip_rect)
 
 
 def _resolve_print_source(job: JobSettings, placement: Placement) -> tuple[str, int, tuple[float, float, float, float]]:
@@ -142,26 +162,30 @@ def generate_output_docs(job: JobSettings, layout: LayoutResult) -> OutputDocs:
     cut_page = cut_doc.new_page(width=page_rect.width, height=page_rect.height)
 
     use_special = bool(job.special_mode_pattern and job.special_mode_pattern.enabled)
-    for placement in layout.placements:
-        print_path, print_page_index, print_bbox = _resolve_print_source(job, placement)
-        _place_pdf_page(
-            print_page,
-            print_path,
-            print_page_index,
-            print_bbox,
-            placement,
-            use_full_page=use_special,
-        )
-        if not job.generate_cut_grid:
-            cut_path, cut_page_index, cut_bbox = _resolve_cut_source(job, placement)
+    sources = _SourceCache()
+    try:
+        for placement in layout.placements:
+            print_path, print_page_index, print_bbox = _resolve_print_source(job, placement)
             _place_pdf_page(
-                cut_page,
-                cut_path,
-                cut_page_index,
-                cut_bbox,
+                print_page,
+                sources.get(print_path),
+                print_page_index,
+                print_bbox,
                 placement,
                 use_full_page=use_special,
             )
+            if not job.generate_cut_grid:
+                cut_path, cut_page_index, cut_bbox = _resolve_cut_source(job, placement)
+                _place_pdf_page(
+                    cut_page,
+                    sources.get(cut_path),
+                    cut_page_index,
+                    cut_bbox,
+                    placement,
+                    use_full_page=use_special,
+                )
+    finally:
+        sources.close()
 
     if job.generate_cut_grid:
         _draw_generated_cut_grid(cut_page, layout)

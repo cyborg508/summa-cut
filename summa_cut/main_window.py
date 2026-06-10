@@ -100,6 +100,9 @@ class MainWindow(QMainWindow):
         self.special_mode_pattern: SpecialModePattern | None = None
         self.special_mode_prepared: PreparedSpecialModeDocs | None = None
         self.special_mode_editor: MontageEditorWindow | None = None
+        self.preview_fast_timer = QTimer(self)
+        self.preview_fast_timer.setSingleShot(True)
+        self.preview_fast_timer.timeout.connect(self._refresh_fast_preview)
         self.preview_refresh_timer = QTimer(self)
         self.preview_refresh_timer.setSingleShot(True)
         self.preview_refresh_timer.timeout.connect(self._refresh_live_preview)
@@ -952,8 +955,44 @@ class MainWindow(QMainWindow):
     def _schedule_preview_refresh(self) -> None:
         self.current_layout = None
         self.state.estimated_items = 0
-        self.preview_refresh_timer.start(250)
+        # Dwustopniowo: szybki podgląd geometryczny zaraz, ciężkie PDF-y po pauzie.
+        self.preview_fast_timer.start(150)
+        self.preview_refresh_timer.start(700)
         self._update_summary(preview_pending=True)
+
+    def _build_job_and_layout(self) -> tuple[JobSettings, object]:
+        job = self._build_job_settings()
+        layout = compute_layout(job)
+        if layout.unplaced_count > 0:
+            raise ValueError(
+                f"Na tej formatce mieści się {layout.capacity_count} szt., a lista montażu żąda {layout.requested_count} szt. "
+                f"Brakuje miejsca na {layout.unplaced_count} szt."
+            )
+        if layout.count <= 0:
+            raise ValueError("Przy tych parametrach żaden użytek nie mieści się w polu roboczym OPOS.")
+        return job, layout
+
+    def _refresh_fast_preview(self) -> None:
+        """Szybki podgląd geometryczny arkusza (sam layout, bez budowania PDF-ów).
+
+        Odpala się przy pisaniu — tania część pipeline'u (~kilkadziesiąt ms).
+        Ciężki render PDF (`_refresh_live_preview`) robi się dopiero po pauzie.
+        """
+        try:
+            job, layout = self._build_job_and_layout()
+            self.current_layout = layout
+            sheet_w, sheet_h = self._preview_target_size(self.sheet_preview_area)
+            self._set_preview_pixmap(
+                self.sheet_preview_label,
+                render_layout_preview(job, layout, width_px=sheet_w, height_px=sheet_h),
+                "Brak podglądu arkusza",
+            )
+            self.save_btn.setEnabled(False)  # pełny PDF jeszcze nie zbudowany
+            self._update_summary()
+        except Exception as exc:
+            self.current_layout = None
+            self._set_preview_pixmap(self.sheet_preview_label, None, f"Brak podglądu arkusza.\n\n{exc}")
+            self._update_summary(error_text=str(exc))
 
     def _build_job_settings(self) -> JobSettings:
         print_file_index = self.print_file_combo.currentIndex()
@@ -1050,17 +1089,10 @@ class MainWindow(QMainWindow):
         self.current_output_docs = None
 
     def _refresh_live_preview(self) -> tuple[JobSettings, object] | None:
+        self.preview_fast_timer.stop()  # ciężki przebieg wyprzedza/zastępuje szybki
         self.save_btn.setEnabled(False)
         try:
-            job = self._build_job_settings()
-            layout = compute_layout(job)
-            if layout.unplaced_count > 0:
-                raise ValueError(
-                    f"Na tej formatce mieści się {layout.capacity_count} szt., a lista montażu żąda {layout.requested_count} szt. "
-                    f"Brakuje miejsca na {layout.unplaced_count} szt."
-                )
-            if layout.count <= 0:
-                raise ValueError("Przy tych parametrach żaden użytek nie mieści się w polu roboczym OPOS.")
+            job, layout = self._build_job_and_layout()
             self._close_current_output_docs()
             output_docs = generate_output_docs(job, layout)
             self.current_output_docs = output_docs
