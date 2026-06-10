@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import fitz
+from PySide6.QtCore import QRectF
 from PySide6.QtGui import QColor, QImage, QPainter, QPen, QPixmap
 
 from .models import JobSettings, LayoutResult
@@ -30,7 +31,35 @@ def render_pdf_page_to_pixmap(doc: fitz.Document, max_width: int = 900, max_heig
     return QPixmap.fromImage(image)
 
 
-def render_layout_preview(job: JobSettings, layout: LayoutResult, width_px: int = 900, height_px: int = 900) -> QPixmap:
+def render_source_tile(
+    doc: fitz.Document,
+    page_index: int,
+    clip_bbox_pt: tuple[float, float, float, float] | None = None,
+    max_px: int = 280,
+) -> QPixmap:
+    """Rasteryzuje RAZ obszar zawartości strony źródłowej do miniatury (kafla).
+
+    Kafel jest potem „stemplowany" N razy w podglądzie (QPainter), zamiast budować
+    pełny PDF wyjściowy przy każdej zmianie — to czyni podgląd O(1) względem
+    liczby użytków.
+    """
+    page = doc[page_index]
+    clip = fitz.Rect(clip_bbox_pt) if clip_bbox_pt else page.rect
+    if clip.is_empty or clip.is_infinite:
+        clip = page.rect
+    scale = max_px / max(clip.width, clip.height, 1.0)
+    pix = page.get_pixmap(matrix=fitz.Matrix(scale, scale), clip=clip, alpha=False)
+    image = QImage(pix.samples, pix.width, pix.height, pix.stride, QImage.Format.Format_RGB888).copy()
+    return QPixmap.fromImage(image)
+
+
+def render_layout_preview(
+    job: JobSettings,
+    layout: LayoutResult,
+    width_px: int = 900,
+    height_px: int = 900,
+    tiles: dict[int, QPixmap] | None = None,
+) -> QPixmap:
     pixmap = QPixmap(width_px, height_px)
     pixmap.fill(QColor("white"))
     painter = QPainter(pixmap)
@@ -61,11 +90,32 @@ def render_layout_preview(job: JobSettings, layout: LayoutResult, width_px: int 
 
     default_color = QColor("#27ae60")
     for placement in layout.placements:
-        color = default_color
-        if job.montage_items:
-            color = MONTAGE_COLORS[placement.montage_item_index % len(MONTAGE_COLORS)]
-        painter.setPen(QPen(color, 1))
-        painter.drawRect(tx(placement.x_mm), ty(placement.y_mm), placement.width_mm * scale, placement.height_mm * scale)
+        px = tx(placement.x_mm)
+        py = ty(placement.y_mm)
+        pw = placement.width_mm * scale
+        ph = placement.height_mm * scale
+        tile = tiles.get(placement.montage_item_index) if tiles else None
+        if tile is not None and not tile.isNull():
+            target = QRectF(px, py, pw, ph)
+            src_rect = QRectF(tile.rect())
+            if placement.rotation_deg == 90:
+                painter.save()
+                painter.translate(px + pw / 2.0, py + ph / 2.0)
+                painter.rotate(90)
+                painter.drawPixmap(QRectF(-ph / 2.0, -pw / 2.0, ph, pw), tile, src_rect)
+                painter.restore()
+            else:
+                painter.drawPixmap(target, tile, src_rect)
+            painter.setPen(QPen(QColor("#9aa0a6"), 1))
+            painter.setBrush(QColor(0, 0, 0, 0))
+            painter.drawRect(px, py, pw, ph)
+        else:
+            color = default_color
+            if job.montage_items:
+                color = MONTAGE_COLORS[placement.montage_item_index % len(MONTAGE_COLORS)]
+            painter.setPen(QPen(color, 1))
+            painter.setBrush(QColor(0, 0, 0, 0))
+            painter.drawRect(px, py, pw, ph)
 
     painter.setPen(QPen(QColor("#000000"), 1))
     painter.setBrush(QColor("#000000"))

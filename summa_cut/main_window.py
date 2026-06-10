@@ -3,10 +3,12 @@ from __future__ import annotations
 from pathlib import Path
 import re
 
+import fitz
 from PySide6.QtCore import Qt, Signal, QTimer
 from PySide6.QtGui import QDragEnterEvent, QDropEvent, QPixmap
 from PySide6.QtWidgets import (
     QAbstractItemView,
+    QApplication,
     QCheckBox,
     QComboBox,
     QFileDialog,
@@ -35,7 +37,7 @@ from .export import OutputDocs, generate_output_docs, save_output_docs
 from .layout import compute_layout
 from .models import AppState, InputFile, ItemSpec, JobSettings, MontageItem, SelectedPage, SheetSpec, SpecialModePattern, Placement, RectMM
 from .pdf_io import PdfReadError, read_pdf_info
-from .preview import render_layout_preview, render_pdf_page_to_pixmap
+from .preview import render_layout_preview, render_source_tile
 from .settings import load_settings, save_settings
 from .special_mode_window import MontageEditorWindow, PreparedSpecialModeDocs, build_special_mode_explicit_placements, prepare_special_mode_docs
 
@@ -97,12 +99,11 @@ class MainWindow(QMainWindow):
         self.montage_items: list[MontageItem] = []
         self.current_output_docs: OutputDocs | None = None
         self.current_layout = None
+        self.current_job: JobSettings | None = None
+        self._tile_cache: dict[tuple[str, int], QPixmap] = {}
         self.special_mode_pattern: SpecialModePattern | None = None
         self.special_mode_prepared: PreparedSpecialModeDocs | None = None
         self.special_mode_editor: MontageEditorWindow | None = None
-        self.preview_fast_timer = QTimer(self)
-        self.preview_fast_timer.setSingleShot(True)
-        self.preview_fast_timer.timeout.connect(self._refresh_fast_preview)
         self.preview_refresh_timer = QTimer(self)
         self.preview_refresh_timer.setSingleShot(True)
         self.preview_refresh_timer.timeout.connect(self._refresh_live_preview)
@@ -545,6 +546,7 @@ class MainWindow(QMainWindow):
 
     def _add_pdf_files(self, paths: list[str]) -> None:
         self._clear_special_mode_pattern()
+        self._tile_cache.clear()  # nowe pliki → unieważnij miniatury źródeł
         added = 0
         for path in paths:
             if any(existing.path == path for existing in self.input_files):
@@ -955,9 +957,8 @@ class MainWindow(QMainWindow):
     def _schedule_preview_refresh(self) -> None:
         self.current_layout = None
         self.state.estimated_items = 0
-        # Dwustopniowo: szybki podgląd geometryczny zaraz, ciężkie PDF-y po pauzie.
-        self.preview_fast_timer.start(150)
-        self.preview_refresh_timer.start(700)
+        # Podgląd jest teraz lekki (raster kafelkowy, bez budowania PDF) → krótki debounce.
+        self.preview_refresh_timer.start(120)
         self._update_summary(preview_pending=True)
 
     def _build_job_and_layout(self) -> tuple[JobSettings, object]:
@@ -972,27 +973,31 @@ class MainWindow(QMainWindow):
             raise ValueError("Przy tych parametrach żaden użytek nie mieści się w polu roboczym OPOS.")
         return job, layout
 
-    def _refresh_fast_preview(self) -> None:
-        """Szybki podgląd geometryczny arkusza (sam layout, bez budowania PDF-ów).
+    def _source_tile(self, path: str, page_index: int, bbox_pt) -> QPixmap:
+        """Miniatura zawartości strony źródłowej (cache po ścieżce+stronie)."""
+        key = (path, page_index)
+        tile = self._tile_cache.get(key)
+        if tile is None:
+            doc = fitz.open(path)
+            try:
+                tile = render_source_tile(doc, page_index, bbox_pt)
+            finally:
+                doc.close()
+            self._tile_cache[key] = tile
+        return tile
 
-        Odpala się przy pisaniu — tania część pipeline'u (~kilkadziesiąt ms).
-        Ciężki render PDF (`_refresh_live_preview`) robi się dopiero po pauzie.
-        """
-        try:
-            job, layout = self._build_job_and_layout()
-            self.current_layout = layout
-            sheet_w, sheet_h = self._preview_target_size(self.sheet_preview_area)
-            self._set_preview_pixmap(
-                self.sheet_preview_label,
-                render_layout_preview(job, layout, width_px=sheet_w, height_px=sheet_h),
-                "Brak podglądu arkusza",
-            )
-            self.save_btn.setEnabled(False)  # pełny PDF jeszcze nie zbudowany
-            self._update_summary()
-        except Exception as exc:
-            self.current_layout = None
-            self._set_preview_pixmap(self.sheet_preview_label, None, f"Brak podglądu arkusza.\n\n{exc}")
-            self._update_summary(error_text=str(exc))
+    def _source_tiles_for_job(self, job: JobSettings) -> tuple[dict[int, QPixmap], dict[int, QPixmap]]:
+        """Buduje kafle druku i wykrojnika per montage_item_index (klucz 0 gdy brak montażu)."""
+        print_tiles: dict[int, QPixmap] = {}
+        cut_tiles: dict[int, QPixmap] = {}
+        if job.montage_items:
+            for idx, item in enumerate(job.montage_items):
+                print_tiles[idx] = self._source_tile(item.print_page.pdf_path, item.print_page.page_index, item.print_content_bbox_pt)
+                cut_tiles[idx] = self._source_tile(item.cut_page.pdf_path, item.cut_page.page_index, item.cut_content_bbox_pt)
+        else:
+            print_tiles[0] = self._source_tile(job.print_page.pdf_path, job.print_page.page_index, job.print_content_bbox_pt)
+            cut_tiles[0] = self._source_tile(job.cut_page.pdf_path, job.cut_page.page_index, job.cut_content_bbox_pt)
+        return print_tiles, cut_tiles
 
     def _build_job_settings(self) -> JobSettings:
         print_file_index = self.print_file_combo.currentIndex()
@@ -1089,26 +1094,29 @@ class MainWindow(QMainWindow):
         self.current_output_docs = None
 
     def _refresh_live_preview(self) -> tuple[JobSettings, object] | None:
-        self.preview_fast_timer.stop()  # ciężki przebieg wyprzedza/zastępuje szybki
+        """Lekki podgląd: layout + raster kafelkowy (źródło rasteryzowane raz,
+        stemplowane N razy). NIE buduje pełnego PDF — to robi dopiero zapis.
+        Dzięki temu czas podglądu nie zależy od liczby użytków."""
         self.save_btn.setEnabled(False)
         try:
             job, layout = self._build_job_and_layout()
-            self._close_current_output_docs()
-            output_docs = generate_output_docs(job, layout)
-            self.current_output_docs = output_docs
             self.current_layout = layout
+            self.current_job = job
+            print_tiles, cut_tiles = self._source_tiles_for_job(job)
             print_w, print_h = self._preview_target_size(self.print_preview_area)
             cut_w, cut_h = self._preview_target_size(self.cut_preview_area)
             sheet_w, sheet_h = self._preview_target_size(self.sheet_preview_area)
-            self._set_preview_pixmap(self.print_preview_label, render_pdf_page_to_pixmap(output_docs.print_doc, max_width=print_w, max_height=print_h), "Brak podglądu druku")
-            self._set_preview_pixmap(self.cut_preview_label, render_pdf_page_to_pixmap(output_docs.cut_doc, max_width=cut_w, max_height=cut_h), "Brak podglądu wykrojnika")
+            # tryb bez odstępów: wykrojnik = generowana krata → schemat (obrysy), bez kafli źródła
+            cut_preview_tiles = None if job.generate_cut_grid else cut_tiles
+            self._set_preview_pixmap(self.print_preview_label, render_layout_preview(job, layout, width_px=print_w, height_px=print_h, tiles=print_tiles), "Brak podglądu druku")
+            self._set_preview_pixmap(self.cut_preview_label, render_layout_preview(job, layout, width_px=cut_w, height_px=cut_h, tiles=cut_preview_tiles), "Brak podglądu wykrojnika")
             self._set_preview_pixmap(self.sheet_preview_label, render_layout_preview(job, layout, width_px=sheet_w, height_px=sheet_h), "Brak podglądu arkusza")
             self.save_btn.setEnabled(True)
             self._update_summary()
             return job, layout
         except Exception as exc:
-            self._close_current_output_docs()
             self.current_layout = None
+            self.current_job = None
             self._set_preview_pixmap(self.print_preview_label, None, f"Brak podglądu druku.\n\n{exc}")
             self._set_preview_pixmap(self.cut_preview_label, None, f"Brak podglądu wykrojnika.\n\n{exc}")
             self._set_preview_pixmap(self.sheet_preview_label, None, f"Brak podglądu arkusza.\n\n{exc}")
@@ -1125,7 +1133,8 @@ class MainWindow(QMainWindow):
         self._update_summary()
 
     def _save_both_pdfs(self) -> None:
-        if not self.current_output_docs:
+        # Podgląd nie buduje już PDF — upewnij się, że mamy ważny układ.
+        if self.current_job is None or self.current_layout is None:
             if self._refresh_live_preview() is None:
                 QMessageBox.warning(self, "summa-cut", "Najpierw ustaw poprawne parametry i wygeneruj układ.")
                 return
@@ -1143,7 +1152,7 @@ class MainWindow(QMainWindow):
         dialog.selectFile(f"{default_base_name}_druk.pdf")
         dialog.setLabelText(QFileDialog.Accept, "Zapisz")
 
-        if dialog.exec() != QDialog.Accepted or not self.current_output_docs:
+        if dialog.exec() != QDialog.Accepted or self.current_job is None or self.current_layout is None:
             return
 
         selected_path = Path(dialog.selectedFiles()[0])
@@ -1153,7 +1162,19 @@ class MainWindow(QMainWindow):
 
         self.settings["last_output_dir"] = str(target_dir)
         self._save_ui_settings()
-        print_path, cut_path = save_output_docs(self.current_output_docs, target_dir, base_name)
+
+        # Pełny PDF budujemy DOPIERO TUTAJ (osadzanie wszystkich użytków) — może chwilę potrwać.
+        QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
+        self.statusBar().showMessage("Buduję pliki wynikowe…")
+        try:
+            output_docs = generate_output_docs(self.current_job, self.current_layout)
+            try:
+                print_path, cut_path = save_output_docs(output_docs, target_dir, base_name)
+            finally:
+                output_docs.print_doc.close()
+                output_docs.cut_doc.close()
+        finally:
+            QApplication.restoreOverrideCursor()
         self.statusBar().showMessage(f"Zapisano {print_path.name} i {cut_path.name}")
         QMessageBox.information(self, "summa-cut", f"Zapisano:\n- {print_path}\n- {cut_path}")
 
