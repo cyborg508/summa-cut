@@ -1,0 +1,171 @@
+<!doctype html>
+<html lang="pl">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>summa-cut — przygotowanie PDF do druku i cięcia</title>
+    <meta
+      name="description"
+      content="summa-cut to desktopowe narzędzie do przygotowania PDF do druku i cięcia na ploterze Summa — z osobnym drukiem i wykrojnikiem, podglądem i eksportem gotowych plików."
+    />
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <header class="hero">
+      <div class="wrap">
+        <span class="eyebrow">summa-cut</span>
+        <h1>Przygotowanie PDF do druku i cięcia bez ręcznej gimnastyki</h1>
+        <p class="lead">
+          Desktopowy program do układania użytków, rozdzielania druku i wykrojnika,
+          podglądu arkusza i eksportu gotowych plików <strong>druk.pdf</strong> oraz
+          <strong>wykrojnik.pdf</strong>.
+        </p>
+        <div class="cta-row">
+          <a class="button primary" href="#status">Zobacz status projektu</a>
+          <a class="button" href="#features">Funkcje</a>
+        </div>
+      </div>
+    </header>
+
+    <main>
+      <section class="section">
+        <div class="wrap two-col">
+          <div>
+            <h2>Po co powstał summa-cut</h2>
+            <p>
+              Program powstaje z praktycznej potrzeby produkcyjnej: szybciej przygotować PDF-y
+              do wydruku i cięcia na ploterze, bez powtarzalnej ręcznej roboty i bez mieszania
+              ustawień między drukiem a wykrojnikiem.
+            </p>
+            <p>
+              To nie jest ogólny kombajn DTP. Kierunek jest prosty: narzędzie do konkretnego,
+              technicznego workflow poligraficznego.
+            </p>
+          </div>
+          <aside class="card accent">
+            <h3>Aktualny fokus</h3>
+            <ul>
+              <li>PDF wejściowy dla druku i wykrojnika</li>
+              <li>układ użytków na arkuszu</li>
+              <li>OPOS-y i bezpieczne pole robocze</li>
+              <li>eksport gotowych plików produkcyjnych</li>
+            </ul>
+          </aside>
+        </div>
+      </section>
+
+      <section class="section alt" id="features">
+        <div class="wrap">
+          <h2>Co już działa</h2>
+          <div class="grid cards-3">
+            <article class="card">
+              <h3>Niezależny wybór druku i wykrojnika</h3>
+              <p>
+                Można wskazać osobny plik i osobną stronę dla druku oraz wykrojnika,
+                także przy wielostronicowych PDF-ach.
+              </p>
+            </article>
+            <article class="card">
+              <h3>Podgląd i układ arkusza</h3>
+              <p>
+                Program liczy prosty layout siatkowy, pokazuje podgląd druku, wykrojnika
+                i całego arkusza oraz umie porównać wariant 0° / 90°.
+              </p>
+            </article>
+            <article class="card">
+              <h3>Eksport produkcyjny</h3>
+              <p>
+                Gotowy wynik zapisuje jako dwa pliki: <strong>druk.pdf</strong> oraz
+                <strong>wykrojnik.pdf</strong>.
+              </p>
+            </article>
+            <article class="card">
+              <h3>Tryb z odstępami</h3>
+              <p>
+                Układ działa jako kafel <em>użytek + odstęp</em>, z centrowaniem i przycinaniem
+                obu źródeł do wspólnego modułu.
+              </p>
+            </article>
+            <article class="card">
+              <h3>Tryb bez odstępów</h3>
+              <p>
+                Program układa druk na styk i generuje siatkę linii wykrojnika wychodzących
+                1 mm poza skrajny obrys.
+              </p>
+            </article>
+            <article class="card">
+              <h3>Tryb specjalny</h3>
+              <p>
+                Osobny prototyp do nieregularnych kształtów: trimowanie druku do rzeczywistego
+                obrysu wykrojnika + spad.
+              </p>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <section class="section" id="status">
+        <div class="wrap two-col">
+          <div>
+            <h2>Status projektu</h2>
+            <p>
+              Projekt jest na etapie roboczego MVP. Najważniejsza baza już działa,
+              ale to jeszcze nie jest finalna wersja handlowa.
+            </p>
+            <ul class="checklist">
+              <li>działające GUI desktopowe w Pythonie / PySide6</li>
+              <li>drag &amp; drop PDF</li>
+              <li>bounding box z pliku druku</li>
+              <li>OPOS-y 2 × 2 mm</li>
+              <li>eksport dwóch PDF-ów wyjściowych</li>
+              <li>prototyp trybu specjalnego z clipping path</li>
+            </ul>
+          </div>
+          <aside class="card">
+            <h3>Najbliższe kroki</h3>
+            <ol>
+              <li>testy na realnych plikach produkcyjnych</li>
+              <li>dopracowanie montażu 2×2 i sterowania wzorcem</li>
+              <li>lepsza ergonomia edytora trybu specjalnego</li>
+              <li>przygotowanie paczki Windows do łatwego wdrożenia</li>
+            </ol>
+          </aside>
+        </div>
+      </section>
+
+      <section class="section alt" id="download">
+        <div class="wrap two-col">
+          <div>
+            <h2>Pobieranie</h2>
+            <p>
+              Sekcja pod przyszłe wydania. Na razie projekt jest przygotowywany lokalnie
+              i jeszcze nie ma publicznej paczki do pobrania.
+            </p>
+          </div>
+          <aside class="card muted">
+            <h3>Planowana zawartość</h3>
+            <ul>
+              <li>wersja Windows</li>
+              <li>krótka instrukcja uruchomienia</li>
+              <li>lista zmian</li>
+            </ul>
+          </aside>
+        </div>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <div class="wrap footer-inner">
+        <div>
+          <strong>summa-cut</strong>
+          <p>Narzędzie do przygotowania PDF do druku i cięcia na ploterze.</p>
+        </div>
+        <div class="footer-links">
+          <a href="#features">Funkcje</a>
+          <a href="#status">Status</a>
+          <a href="#download">Pobieranie</a>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>
