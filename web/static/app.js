@@ -3,6 +3,18 @@ const $ = (id) => document.getElementById(id);
 const uploads = {};          // name -> page_count
 let montage = [];            // [{label,print_upload,print_page,cut_upload,cut_page,quantity}]
 let previewTimer = null;
+// stan trybu specjalnego: po „Przygotuj" trzyma przycięte uploady i rozmiar kafla
+const special = { printUpload: null, cutUpload: null, pageW: 0, pageH: 0, ready: false };
+
+function specialOffsets() {
+  const v = (id) => parseFloat($(id).value) || 0;
+  return {
+    special_row_offsets_mm: [v("special-row0"), v("special-row1")],
+    special_col_offsets_mm: [v("special-col0"), v("special-col1")],
+    special_col_x_offsets_mm: [v("special-colx0"), v("special-colx1")],
+    special_row_y_offsets_mm: [v("special-rowy0"), v("special-rowy1")],
+  };
+}
 
 async function init() {
   await fetch("/api/session", { method: "POST" });
@@ -14,12 +26,23 @@ function wireEvents() {
   $("generate-btn").addEventListener("click", doGenerate);
   $("montage-add").addEventListener("click", () => { addMontageRow(); schedulePreview(); });
   $("montage-enable").addEventListener("change", onMontageToggle);
+  $("special-enable").addEventListener("change", onSpecialToggle);
+  $("special-prepare-btn").addEventListener("click", doSpecialPrepare);
   // każda zmiana kontrolki → przeliczenie podglądu (debounce)
   $("controls").addEventListener("input", schedulePreview);
   $("controls").addEventListener("change", schedulePreview);
   // zmiana pliku → odśwież listę stron
   $("print-file").addEventListener("change", () => fillPages("print-file", "print-page"));
   $("cut-file").addEventListener("change", () => fillPages("cut-file", "cut-page"));
+  // Zmiana źródła/strony druku lub wykrojnika albo spadu unieważnia przygotowany
+  // wykrojnik trybu specjalnego (przycięcie przestaje pasować). Robimy to PRZED
+  // (debounce'owanym) podglądem przez #controls, więc kolejny podgląd widzi już
+  // stan „niegotowy" i wraca do zwykłego zadania zamiast starego przycięcia.
+  $("print-file").addEventListener("change", invalidateSpecial);
+  $("print-page").addEventListener("change", invalidateSpecial);
+  $("cut-file").addEventListener("change", invalidateSpecial);
+  $("cut-page").addEventListener("change", invalidateSpecial);
+  $("special-bleed").addEventListener("input", invalidateSpecial);
 }
 
 async function doUpload() {
@@ -78,15 +101,92 @@ function fillPages(fileId, pageId) {
   sel.innerHTML = pageOptionsHtml(name, cur);
 }
 
-function onMontageToggle() {
-  const on = $("montage-enable").checked;
-  if (on) {
-    $("gap-on").checked = true;     // montaż wymaga trybu z odstępami
+// Wspólna blokada trybu odstępów: montaż ORAZ tryb specjalny wymagają układu
+// „z odstępami". Liczymy stan z OBU przełączników, żeby się nie nadpisywały
+// (gdy jeden się wyłącza, a drugi wciąż chce blokady).
+function updateGapLock() {
+  const lock = $("montage-enable").checked || $("special-enable").checked;
+  if (lock) {
+    $("gap-on").checked = true;
     $("gap-off").disabled = true;
-    if (montage.length === 0) addMontageRow();
   } else {
     $("gap-off").disabled = false;
   }
+}
+
+function onMontageToggle() {
+  const on = $("montage-enable").checked;
+  if (on && montage.length === 0) addMontageRow();
+  updateGapLock();
+  schedulePreview();
+}
+
+function onSpecialToggle() {
+  const on = $("special-enable").checked;
+  $("special-body").hidden = !on;
+  updateGapLock();
+  schedulePreview();
+}
+
+// Unieważnia gotowość trybu specjalnego: po przygotowaniu wykrojnika special.*
+// trzyma PRZYCIĘTE uploady i rozmiar kafla dla KONKRETNEGO źródła/spadu. Gdy
+// użytkownik zmieni plik/stronę druku lub wykrojnika albo spad, te dane są
+// nieaktualne — kasujemy je, żeby collectParams() nie wysłał starego przycięcia
+// (inaczej podgląd/generowanie pokazałyby grafikę, która już nie pasuje).
+function invalidateSpecial() {
+  special.ready = false;
+  special.printUpload = null;
+  special.cutUpload = null;
+  special.pageW = 0;
+  special.pageH = 0;
+  const status = $("special-status");
+  if ($("special-enable").checked) {
+    status.classList.remove("err");
+    status.textContent = "Zmieniono źródło/spad — kliknij „Przygotuj wykrojnik” ponownie.";
+  } else {
+    status.classList.remove("err");
+    status.textContent = "";
+  }
+}
+
+async function doSpecialPrepare() {
+  const status = $("special-status");
+  const payload = {
+    print_upload: $("print-file").value,
+    print_page: parseInt($("print-page").value || "0", 10),
+    cut_upload: $("cut-file").value,
+    cut_page: parseInt($("cut-page").value || "0", 10),
+    bleed_mm: parseFloat($("special-bleed").value) || 0,
+  };
+  status.classList.remove("err");
+  status.textContent = "Przygotowuję…";
+  special.ready = false;
+  let res;
+  try {
+    res = await fetch("/api/special/prepare", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+  } catch (e) {
+    status.classList.add("err");
+    status.textContent = "Błąd sieci: " + ((e && e.message) || e);
+    return;
+  }
+  if (!res.ok) {
+    let detail;
+    try { detail = (await res.json()).detail; } catch (e) { detail = await res.text(); }
+    status.classList.add("err");
+    status.textContent = "Błąd: " + (detail || res.status);
+    return;
+  }
+  const b = await res.json();
+  special.printUpload = b.print_upload;
+  special.cutUpload = b.cut_upload;
+  special.pageW = b.page_width_mm;
+  special.pageH = b.page_height_mm;
+  special.ready = true;
+  status.textContent = `Gotowe: kafel ${b.page_width_mm.toFixed(1)}×${b.page_height_mm.toFixed(1)} mm`;
   schedulePreview();
 }
 
@@ -134,7 +234,7 @@ function optList(names, selected) {
 
 function collectParams() {
   const gap = document.querySelector("input[name=gapmode]:checked").value === "gap";
-  return {
+  const params = {
     print_upload: $("print-file").value,
     print_page: parseInt($("print-page").value || "0", 10),
     cut_upload: $("cut-file").value || null,
@@ -156,6 +256,22 @@ function collectParams() {
     opos_top_offset_mm: parseFloat($("opos-top").value),
     montage: $("montage-enable").checked ? montage : [],
   };
+  // Tryb specjalny: tylko gdy włączony I przygotowany (mamy przycięte uploady
+  // i rozmiar kafla). Gdy zaznaczony, ale jeszcze nie przygotowany — nie wysyłamy
+  // special_enabled, żeby podgląd/układ nie wybuchał (backend wymaga przygotowania).
+  if ($("special-enable").checked && special.ready) {
+    Object.assign(params, {
+      print_upload: special.printUpload,
+      cut_upload: special.cutUpload,
+      print_page: 0,
+      cut_page: 0,
+      item_w_mm: special.pageW,
+      item_h_mm: special.pageH,
+      special_enabled: true,
+      ...specialOffsets(),
+    });
+  }
+  return params;
 }
 
 function schedulePreview() {
@@ -183,7 +299,8 @@ async function applyJob() {
 }
 
 async function updatePreview() {
-  if (!$("print-file").value && !$("montage-enable").checked) return;
+  const specialReady = $("special-enable").checked && special.ready;
+  if (!$("print-file").value && !$("montage-enable").checked && !specialReady) return;
   if (await applyJob()) {
     const t = Date.now();
     $("preview-print").src = `/api/preview/print.png?t=${t}`;

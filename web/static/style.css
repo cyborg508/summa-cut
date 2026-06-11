@@ -22,3 +22,6 @@ button { cursor: pointer; padding: 6px 12px; border: 1px solid #c7c7cc; border-r
 .downloads a { display: inline-block; margin-right: 12px; }
 .montage-row { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; border-top: 1px dashed #ddd; padding: 6px 0; }
 .montage-row input[type=number] { width: 56px; }
+.special-offsets label { display: inline-block; width: 9rem; }
+.special-status { margin-left: 0.5rem; color: #2a6; }
+.special-status.err { color: #a32018; }

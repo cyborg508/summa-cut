@@ -13,13 +13,22 @@ from fastapi.staticfiles import StaticFiles
 
 from summa_cut.export import generate_output_docs, save_output_docs
 from summa_cut.layout import compute_layout
-from web.job_builder import JobParams, build_job
+from summa_cut.special_trim import prepare_special_trim
+from web.job_builder import JobParams, _require_page, build_job
 from web.preview_render import render_output_png
 from web.sessions import Session, SessionStore
 
 
 class GenerateParams(BaseModel):
     base_name: str = "wynik"
+
+
+class SpecialPrepareParams(BaseModel):
+    print_upload: str
+    print_page: int = 0
+    cut_upload: str
+    cut_page: int = 0
+    bleed_mm: float = 3.0
 
 
 def create_app(store: SessionStore) -> FastAPI:
@@ -69,6 +78,29 @@ def create_app(store: SessionStore) -> FastAPI:
             "page_count": info.page_count,
             "page_sizes_mm": info.page_sizes_mm,
             "page_content_sizes_mm": info.page_content_sizes_mm,
+        }
+
+    @app.post("/api/special/prepare")
+    def special_prepare(params: SpecialPrepareParams, session: Session = Depends(current_session)) -> dict:
+        if params.print_upload not in session.uploads or params.cut_upload not in session.uploads:
+            raise HTTPException(status_code=400, detail="Najpierw wgraj pliki druku i wykrojnika.")
+        try:
+            print_info = _require_page(session, params.print_upload, params.print_page, "druk (tryb specjalny)")
+            cut_info = _require_page(session, params.cut_upload, params.cut_page, "wykrojnik (tryb specjalny)")
+            result = prepare_special_trim(
+                print_pdf_path=print_info.path, print_page=params.print_page,
+                cut_pdf_path=cut_info.path, cut_page=params.cut_page,
+                bleed_mm=params.bleed_mm, out_dir=session.workdir,
+            )
+            print_reg = store.save_upload(session, result.print_path.name, result.print_path.read_bytes())
+            cut_reg = store.save_upload(session, result.cut_path.name, result.cut_path.read_bytes())
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc))
+        return {
+            "print_upload": print_reg.name,
+            "cut_upload": cut_reg.name,
+            "page_width_mm": result.page_width_mm,
+            "page_height_mm": result.page_height_mm,
         }
 
     @app.post("/api/job")
