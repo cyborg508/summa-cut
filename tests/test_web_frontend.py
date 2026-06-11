@@ -76,6 +76,25 @@ def test_app_js_references_special_endpoints():
     assert "special_enabled" in js
 
 
+def test_index_has_3x3_editor():
+    from pathlib import Path
+    html = (Path(__file__).resolve().parents[1] / "web" / "static" / "index.html").read_text(encoding="utf-8")
+    assert 'id="special-editor"' in html
+    assert 'id="special-legend"' in html
+    assert "<details" in html and "Dostrojenie ręczne" in html
+    for el_id in ["special-row0", "special-row1", "special-col0", "special-col1",
+                  "special-colx0", "special-colx1", "special-rowy0", "special-rowy1"]:
+        assert f'id="{el_id}"' in html
+
+
+def test_app_js_has_editor_logic():
+    from pathlib import Path
+    js = (Path(__file__).resolve().parents[1] / "web" / "static" / "app.js").read_text(encoding="utf-8")
+    assert "/api/special/tile.png" in js
+    assert "tileOrigin" in js and "applyDrag" in js
+    assert "renderSpecialEditor" in js
+
+
 def test_app_js_invalidates_special_on_input_change():
     # Po przygotowaniu wykrojnika zmiana pliku/strony/spadu musi unieważnić
     # gotowość trybu specjalnego, inaczej collectParams() wysłałby stare

@@ -6,6 +6,135 @@ let previewTimer = null;
 // stan trybu specjalnego: po „Przygotuj" trzyma przycięte uploady i rozmiar kafla
 const special = { printUpload: null, cutUpload: null, pageW: 0, pageH: 0, ready: false };
 
+// --- Edytor 3×3 trybu specjalnego -------------------------------------------
+let selectedTile = [1, 1];     // [row, col] aktywnego kafla (domyślnie środek)
+let tileImgUrl = null;          // URL obrazka pojedynczego kafla (po prepare)
+let editorDrag = null;          // {row, col, startX, startY, off, scale} podczas drag
+
+// rząd/kol 0 i 2 mapują się na bazę 0 (zewnętrzne), 1 na bazę 1 (środkowa) — jak desktop
+function baseRow(row) { return (row === 0 || row === 2) ? 0 : 1; }
+function baseCol(col) { return (col === 0 || col === 2) ? 0 : 1; }
+
+// off = {row:[a,b], col:[a,b], colx:[a,b], rowy:[a,b]} w mm. Port _preview_tile_origin_pt.
+function tileOrigin(row, col, off, pageW, pageH) {
+  const firstX = off.row[baseRow(row)] + off.colx[0];
+  const secondX = pageW + off.row[baseRow(row)] + off.colx[1];
+  const x = col === 0 ? firstX : (col === 1 ? secondX : secondX + (secondX - firstX));
+  const firstY = off.col[baseCol(col)] + off.rowy[0];
+  const secondY = pageH + off.col[baseCol(col)] + off.rowy[1];
+  const y = row === 0 ? firstY : (row === 1 ? secondY : secondY + (secondY - firstY));
+  return { x, y };
+}
+
+// Przeciąganie kafla (row,col) o (dxMm,dyMm). Bez Shift: przesuw rzędu/kolumny;
+// z Shift: odstęp kolumn/rzędów. Mutuje i zwraca off. Port mouseMoveEvent z desktopu.
+function applyDrag(off, shift, row, col, dxMm, dyMm) {
+  const br = baseRow(row), bc = baseCol(col);
+  if (shift) { off.colx[bc] += dxMm; off.rowy[br] += dyMm; }
+  else { off.row[br] += dxMm; off.col[bc] += dyMm; }
+  return off;
+}
+// eksport do testów (Playwright page.evaluate)
+window.tileOrigin = tileOrigin;
+window.applyDrag = applyDrag;
+window.baseRow = baseRow;
+window.baseCol = baseCol;
+
+function readOffsets() {
+  const v = (id) => parseFloat($(id).value) || 0;
+  return {
+    row: [v("special-row0"), v("special-row1")],
+    col: [v("special-col0"), v("special-col1")],
+    colx: [v("special-colx0"), v("special-colx1")],
+    rowy: [v("special-rowy0"), v("special-rowy1")],
+  };
+}
+function writeOffsets(off) {
+  const r = (n) => Math.round(n * 1000) / 1000;
+  $("special-row0").value = r(off.row[0]);  $("special-row1").value = r(off.row[1]);
+  $("special-col0").value = r(off.col[0]);  $("special-col1").value = r(off.col[1]);
+  $("special-colx0").value = r(off.colx[0]); $("special-colx1").value = r(off.colx[1]);
+  $("special-rowy0").value = r(off.rowy[0]); $("special-rowy1").value = r(off.rowy[1]);
+}
+
+function renderSpecialEditor() {
+  const svg = $("special-editor");
+  if (!svg) return;
+  if (!(special.ready && tileImgUrl)) { svg.innerHTML = ""; return; }
+  const off = readOffsets();
+  const pw = special.pageW, ph = special.pageH;
+  const tiles = [];
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  for (let row = 0; row < 3; row++) {
+    for (let col = 0; col < 3; col++) {
+      const o = tileOrigin(row, col, off, pw, ph);
+      tiles.push({ row, col, x: o.x, y: o.y });
+      minX = Math.min(minX, o.x); minY = Math.min(minY, o.y);
+      maxX = Math.max(maxX, o.x + pw); maxY = Math.max(maxY, o.y + ph);
+    }
+  }
+  const W = 300, H = 260, M = 18;
+  const bw = Math.max(maxX - minX, 1), bh = Math.max(maxY - minY, 1);
+  const scale = Math.min((W - 2 * M) / bw, (H - 2 * M) / bh);
+  const ox = (W - bw * scale) / 2 - minX * scale;
+  const oy = (H - bh * scale) / 2 - minY * scale;
+  svg.dataset.scale = scale;   // px-na-mm dla draga
+  const parts = [];
+  for (const t of tiles) {
+    const x = ox + t.x * scale, y = oy + t.y * scale, w = pw * scale, h = ph * scale;
+    const isCenter = (t.row === 1 && t.col === 1);
+    const isSel = (t.row === selectedTile[0] && t.col === selectedTile[1]);
+    const op = isCenter ? 1 : 0.4;
+    parts.push(`<image href="${tileImgUrl}" x="${x}" y="${y}" width="${w}" height="${h}" opacity="${op}" preserveAspectRatio="none"/>`);
+    const stroke = isSel ? "#111" : (isCenter ? "#2f80ed" : "#bbb");
+    const sw = isSel ? 2 : 1;
+    const dash = isSel ? ' stroke-dasharray="4 3"' : "";
+    parts.push(`<rect class="tile" data-row="${t.row}" data-col="${t.col}" x="${x}" y="${y}" width="${w}" height="${h}" fill="transparent" stroke="${stroke}" stroke-width="${sw}"${dash}/>`);
+  }
+  svg.innerHTML = parts.join("");
+}
+
+function editorPointerDown(e) {
+  const target = e.target.closest(".tile");
+  if (!target) return;
+  const row = parseInt(target.dataset.row, 10), col = parseInt(target.dataset.col, 10);
+  selectedTile = [row, col];
+  const scale = parseFloat($("special-editor").dataset.scale) || 1;
+  editorDrag = { row, col, startX: e.clientX, startY: e.clientY, off: readOffsets(), scale };
+  try { $("special-editor").setPointerCapture(e.pointerId); } catch (_) {}
+  renderSpecialEditor();
+}
+function editorPointerMove(e) {
+  if (!editorDrag) return;
+  const dxMm = (e.clientX - editorDrag.startX) / editorDrag.scale;
+  const dyMm = (e.clientY - editorDrag.startY) / editorDrag.scale;
+  const off = JSON.parse(JSON.stringify(editorDrag.off));  // od świeżego snapshotu, bez kumulacji
+  applyDrag(off, e.shiftKey, editorDrag.row, editorDrag.col, dxMm, dyMm);
+  writeOffsets(off);
+  renderSpecialEditor();
+}
+function editorPointerUp() {
+  if (!editorDrag) return;
+  editorDrag = null;
+  schedulePreview();
+}
+function editorKey(e) {
+  if (!special.ready) return;
+  const step = 0.1;
+  let dx = 0, dy = 0;
+  if (e.key === "ArrowLeft") dx = -step;
+  else if (e.key === "ArrowRight") dx = step;
+  else if (e.key === "ArrowUp") dy = -step;
+  else if (e.key === "ArrowDown") dy = step;
+  else return;
+  e.preventDefault();
+  const off = readOffsets();
+  applyDrag(off, e.shiftKey, selectedTile[0], selectedTile[1], dx, dy);
+  writeOffsets(off);
+  renderSpecialEditor();
+  schedulePreview();
+}
+
 function specialOffsets() {
   const v = (id) => parseFloat($(id).value) || 0;
   return {
@@ -43,6 +172,12 @@ function wireEvents() {
   $("cut-file").addEventListener("change", invalidateSpecial);
   $("cut-page").addEventListener("change", invalidateSpecial);
   $("special-bleed").addEventListener("input", invalidateSpecial);
+  const ed = $("special-editor");
+  ed.addEventListener("pointerdown", editorPointerDown);
+  ed.addEventListener("pointermove", editorPointerMove);
+  ed.addEventListener("pointerup", editorPointerUp);
+  ed.addEventListener("keydown", editorKey);
+  $("controls").addEventListener("input", renderSpecialEditor);
 }
 
 async function doUpload() {
@@ -139,6 +274,8 @@ function invalidateSpecial() {
   special.cutUpload = null;
   special.pageW = 0;
   special.pageH = 0;
+  tileImgUrl = null;
+  renderSpecialEditor();
   const status = $("special-status");
   if ($("special-enable").checked) {
     status.classList.remove("err");
@@ -186,6 +323,9 @@ async function doSpecialPrepare() {
   special.pageW = b.page_width_mm;
   special.pageH = b.page_height_mm;
   special.ready = true;
+  tileImgUrl = `/api/special/tile.png?t=${Date.now()}`;
+  selectedTile = [1, 1];
+  renderSpecialEditor();
   status.textContent = `Gotowe: kafel ${b.page_width_mm.toFixed(1)}×${b.page_height_mm.toFixed(1)} mm`;
   schedulePreview();
 }
