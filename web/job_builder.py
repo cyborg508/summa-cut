@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pydantic import BaseModel, Field
 
-from summa_cut.models import ItemSpec, JobSettings, MontageItem, OposSpec, SelectedPage, SheetSpec
+from summa_cut.models import ItemSpec, JobSettings, MontageItem, OposSpec, SelectedPage, SheetSpec, SpecialModePattern
 from web.sessions import Session
 
 
@@ -43,6 +43,14 @@ class JobParams(BaseModel):
 
     montage: list[MontageItemParams] = Field(default_factory=list)
 
+    special_enabled: bool = False
+    special_page_w_mm: float = 0.0
+    special_page_h_mm: float = 0.0
+    special_row_offsets_mm: list[float] = Field(default_factory=lambda: [0.0, 0.0])
+    special_col_offsets_mm: list[float] = Field(default_factory=lambda: [0.0, 0.0])
+    special_col_x_offsets_mm: list[float] = Field(default_factory=lambda: [0.0, 0.0])
+    special_row_y_offsets_mm: list[float] = Field(default_factory=lambda: [0.0, 0.0])
+
 
 def _require_page(session: Session, upload: str, page_index: int, what: str):
     info = session.uploads.get(upload)
@@ -75,11 +83,62 @@ def _build_montage_items(params: JobParams, session: Session) -> list[MontageIte
     return items
 
 
+def _pad2(values: list[float]) -> list[float]:
+    out = list(values[:2]) if values else [0.0, 0.0]
+    while len(out) < 2:
+        out.append(0.0)
+    return out
+
+
+def _build_special_job(params: JobParams, session: Session) -> JobSettings:
+    if not params.cut_upload or params.cut_page is None:
+        raise ValueError("Tryb specjalny: najpierw przygotuj wykrojnik (/api/special/prepare).")
+    print_info = _require_page(session, params.print_upload, params.print_page, "druk (tryb specjalny)")
+    cut_info = _require_page(session, params.cut_upload, params.cut_page, "wykrojnik (tryb specjalny)")
+
+    page_w_mm, page_h_mm = print_info.page_sizes_mm[params.print_page]
+    print_page = SelectedPage(print_info.path, params.print_page)
+    cut_page = SelectedPage(cut_info.path, params.cut_page)
+
+    pattern = SpecialModePattern(
+        enabled=True,
+        print_pdf_path=print_info.path,
+        cut_pdf_path=cut_info.path,
+        page_width_mm=page_w_mm,
+        page_height_mm=page_h_mm,
+        row_offsets_mm=_pad2(params.special_row_offsets_mm),
+        col_offsets_mm=_pad2(params.special_col_offsets_mm),
+        col_x_offsets_mm=_pad2(params.special_col_x_offsets_mm),
+        row_y_offsets_mm=_pad2(params.special_row_y_offsets_mm),
+    )
+    return JobSettings(
+        print_page=print_page,
+        cut_page=cut_page,
+        print_page_size_mm=print_info.page_sizes_mm[params.print_page],
+        cut_page_size_mm=cut_info.page_sizes_mm[params.cut_page],
+        print_content_size_mm=print_info.page_content_sizes_mm[params.print_page],
+        cut_content_size_mm=cut_info.page_content_sizes_mm[params.cut_page],
+        print_content_bbox_pt=print_info.page_content_boxes_pt[params.print_page],
+        cut_content_bbox_pt=cut_info.page_content_boxes_pt[params.cut_page],
+        sheet_spec=SheetSpec(params.sheet_w_mm, params.sheet_h_mm),
+        item_spec=ItemSpec(page_w_mm, page_h_mm, False),
+        gap_enabled=True,
+        gap_mm=0.0,
+        generate_cut_grid=False,
+        montage_items=[],
+        opos_spec=OposSpec(params.opos_side_offset_mm, params.opos_bottom_offset_mm, params.opos_top_offset_mm),
+        special_mode_pattern=pattern,
+    )
+
+
 def build_job(params: JobParams, session: Session) -> JobSettings:
     if params.item_w_mm <= 0 or params.item_h_mm <= 0:
         raise ValueError("Rozmiar użytku musi być większy od zera.")
     if params.sheet_w_mm <= 0 or params.sheet_h_mm <= 0:
         raise ValueError("Rozmiar arkusza musi być większy od zera.")
+
+    if params.special_enabled:
+        return _build_special_job(params, session)
 
     with_gap = params.gap_enabled
     montage_items = _build_montage_items(params, session) if params.montage else []

@@ -172,3 +172,58 @@ def test_montage_requires_gap_mode(tmp_path):
     ], gap_enabled=False)
     with pytest.raises(ValueError):
         build_job(params, s)
+
+
+def test_build_job_special_mode_sets_pattern(tmp_path):
+    from web.job_builder import JobParams, build_job
+    from web.sessions import SessionStore
+
+    store = SessionStore(tmp_path, ttl_seconds=3600)
+    session = store.create()
+    # przygotuj przycięte uploady tak, jak zrobi to trasa /api/special/prepare
+    import fitz
+    for name in ("__special_print__.pdf", "__special_cut__.pdf"):
+        doc = fitz.open()
+        doc.new_page(width=160.0, height=100.0)  # ~56.4 x 35.3 mm
+        data = doc.tobytes()
+        doc.close()
+        store.save_upload(session, name, data)
+
+    params = JobParams(
+        print_upload="__special_print__.pdf", print_page=0,
+        cut_upload="__special_cut__.pdf", cut_page=0,
+        item_w_mm=56.4, item_h_mm=35.3,
+        special_enabled=True,
+        special_page_w_mm=56.4, special_page_h_mm=35.3,
+        special_row_offsets_mm=[0.0, 2.0],
+        special_col_offsets_mm=[0.0, 0.0],
+        special_col_x_offsets_mm=[0.0, 0.0],
+        special_row_y_offsets_mm=[0.0, 0.0],
+    )
+    job = build_job(params, session)
+    assert job.special_mode_pattern is not None
+    assert job.special_mode_pattern.enabled is True
+    assert job.special_mode_pattern.page_width_mm > 0
+    assert job.special_mode_pattern.row_offsets_mm == [0.0, 2.0]
+    assert job.gap_enabled is True  # tryb specjalny = z odstępami
+    assert job.print_page.pdf_path.endswith("__special_print__.pdf")
+    assert job.cut_page.pdf_path.endswith("__special_cut__.pdf")
+
+
+def test_build_job_special_requires_cut_upload(tmp_path):
+    from web.job_builder import JobParams, build_job
+    from web.sessions import SessionStore
+    import fitz, pytest
+
+    store = SessionStore(tmp_path, ttl_seconds=3600)
+    session = store.create()
+    doc = fitz.open(); doc.new_page(width=100, height=100); data = doc.tobytes(); doc.close()
+    store.save_upload(session, "__special_print__.pdf", data)
+    params = JobParams(
+        print_upload="__special_print__.pdf", print_page=0,
+        cut_upload=None, cut_page=None,
+        item_w_mm=30, item_h_mm=30,
+        special_enabled=True, special_page_w_mm=30, special_page_h_mm=30,
+    )
+    with pytest.raises(ValueError):
+        build_job(params, session)
