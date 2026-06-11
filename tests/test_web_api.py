@@ -52,3 +52,54 @@ def test_upload_rejects_non_pdf(tmp_path):
     c.post("/api/session")
     r = c.post("/api/upload", files={"file": ("x.pdf", b"nie-pdf", "application/pdf")})
     assert r.status_code == 400
+
+
+def _session_with_upload(tmp_path):
+    c = _client(tmp_path)
+    c.post("/api/session")
+    c.post("/api/upload", files={"file": ("src.pdf", _pdf_bytes(), "application/pdf")})
+    return c
+
+
+_JOB = dict(
+    print_upload="src.pdf", print_page=0, cut_upload="src.pdf", cut_page=0,
+    sheet_w_mm=330.0, sheet_h_mm=480.0, item_w_mm=30.0, item_h_mm=30.0,
+    gap_enabled=True, gap_mm=3.0,
+)
+
+
+def test_job_returns_layout_summary(tmp_path):
+    c = _session_with_upload(tmp_path)
+    r = c.post("/api/job", json=_JOB)
+    assert r.status_code == 200
+    body = r.json()
+    assert body["count"] > 50
+    assert body["columns"] > 0 and body["rows"] > 0
+
+
+def test_job_with_bad_params_is_400(tmp_path):
+    c = _session_with_upload(tmp_path)
+    r = c.post("/api/job", json={**_JOB, "item_w_mm": 0.0})
+    assert r.status_code == 400
+
+
+def test_preview_returns_png(tmp_path):
+    c = _session_with_upload(tmp_path)
+    c.post("/api/job", json=_JOB)
+    r = c.get("/api/preview/print.png")
+    assert r.status_code == 200
+    assert r.headers["content-type"] == "image/png"
+    assert r.content[:8] == b"\x89PNG\r\n\x1a\n"
+
+
+def test_preview_before_job_is_400(tmp_path):
+    c = _session_with_upload(tmp_path)
+    r = c.get("/api/preview/print.png")
+    assert r.status_code == 400
+
+
+def test_preview_bad_which_is_404(tmp_path):
+    c = _session_with_upload(tmp_path)
+    c.post("/api/job", json=_JOB)
+    r = c.get("/api/preview/bok.png")
+    assert r.status_code == 404
