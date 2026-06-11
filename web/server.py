@@ -9,6 +9,7 @@ from pydantic import BaseModel
 from fastapi import Depends, FastAPI, File, HTTPException, Request, Response, UploadFile
 from fastapi.responses import FileResponse
 from fastapi.responses import Response as RawResponse
+from fastapi.staticfiles import StaticFiles
 
 from summa_cut.export import generate_output_docs, save_output_docs
 from summa_cut.layout import compute_layout
@@ -36,6 +37,13 @@ def create_app(store: SessionStore) -> FastAPI:
 
     app = FastAPI(title="summa-cut web", lifespan=lifespan)
     app.state.store = store
+
+    _static_dir = Path(__file__).parent / "static"
+    app.mount("/static", StaticFiles(directory=str(_static_dir)), name="static")
+
+    @app.get("/")
+    def index() -> FileResponse:
+        return FileResponse(_static_dir / "index.html")
 
     def current_session(request: Request) -> Session:
         session = store.get(request.cookies.get("sid"))
