@@ -137,19 +137,17 @@ def _render_cell_stamp(
     ale TYLKO raz na unikalną sygnaturę."""
     cell_w_pt = mm_to_pt(width_mm)
     cell_h_pt = mm_to_pt(height_mm)
-    stamp = fitz.open()
-    page = stamp.new_page(width=cell_w_pt, height=cell_h_pt)
     src_page = src[page_index]
     clip_rect = src_page.rect if use_full_page else _centered_clip_rect_pt(
         src_page.rect, content_bbox_pt, width_mm, height_mm, rotation_deg,
     )
-    page.show_pdf_page(
-        fitz.Rect(0, 0, cell_w_pt, cell_h_pt),
-        src, page_index, rotate=rotation_deg, clip=clip_rect,
-    )
-    data = stamp.tobytes()
-    stamp.close()
-    return data
+    with fitz.open() as stamp:
+        page = stamp.new_page(width=cell_w_pt, height=cell_h_pt)
+        page.show_pdf_page(
+            fitz.Rect(0, 0, cell_w_pt, cell_h_pt),
+            src, page_index, rotate=rotation_deg, clip=clip_rect,
+        )
+        return stamp.tobytes()
 
 
 def _stamp_placements_pikepdf(
@@ -223,15 +221,13 @@ def generate_output_docs(job: JobSettings, layout: LayoutResult) -> OutputDocs:
     use_special = bool(job.special_mode_pattern and job.special_mode_pattern.enabled)
 
     # 1) BAZA (fitz): puste strony; na wykrojniku krata gdy gapless. Bez OPOS.
-    print_base = fitz.open()
-    cut_base = fitz.open()
-    print_base.new_page(width=page_rect.width, height=page_rect.height)
-    cut_base_page = cut_base.new_page(width=page_rect.width, height=page_rect.height)
-    if job.generate_cut_grid:
-        _draw_generated_cut_grid(cut_base_page, layout)
-    print_base_bytes = print_base.tobytes()
-    cut_base_bytes = cut_base.tobytes()
-    print_base.close(); cut_base.close()
+    with fitz.open() as print_base, fitz.open() as cut_base:
+        print_base.new_page(width=page_rect.width, height=page_rect.height)
+        cut_base_page = cut_base.new_page(width=page_rect.width, height=page_rect.height)
+        if job.generate_cut_grid:
+            _draw_generated_cut_grid(cut_base_page, layout)
+        print_base_bytes = print_base.tobytes()
+        cut_base_bytes = cut_base.tobytes()
 
     # 2) Render unikalnych stempli RAZ + lista (placement, sygnatura).
     sources = _SourceCache()
