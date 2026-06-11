@@ -261,6 +261,13 @@ def test_special_prepare_out_of_range_page_is_400(tmp_path):
     })
     assert over.status_code == 400, over.text
 
+    negative = c.post("/api/special/prepare", json={
+        "print_upload": "zrodlo.pdf", "print_page": -1,
+        "cut_upload": "zrodlo.pdf", "cut_page": 0,
+        "bleed_mm": 3.0,
+    })
+    assert negative.status_code == 400, negative.text
+
 
 def test_special_tile_png_after_prepare(tmp_path):
     c = _client(tmp_path)
@@ -282,10 +289,3 @@ def test_special_tile_png_without_prepare_is_400(tmp_path):
     c.post("/api/session")
     r = c.get("/api/special/tile.png")
     assert r.status_code == 400
-
-    negative = c.post("/api/special/prepare", json={
-        "print_upload": "zrodlo.pdf", "print_page": -1,
-        "cut_upload": "zrodlo.pdf", "cut_page": 0,
-        "bleed_mm": 3.0,
-    })
-    assert negative.status_code == 400, negative.text
