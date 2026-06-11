@@ -179,3 +179,69 @@ def test_montage_bad_upload_is_400(tmp_path):
     }
     r = c.post("/api/job", json=job)
     assert r.status_code == 400
+
+
+def _make_special_source_bytes() -> bytes:
+    doc = fitz.open()
+    page = doc.new_page(width=120.0, height=100.0)
+    page.draw_rect(fitz.Rect(20, 20, 70, 50), color=(0, 0, 0), fill=(0.6, 0.6, 0.6), width=0.0)
+    page.draw_rect(fitz.Rect(20, 20, 70, 50), color=(1, 0, 0), width=0.5)
+    data = doc.tobytes()
+    doc.close()
+    return data
+
+
+def test_special_prepare_then_full_flow(tmp_path):
+    c = _client(tmp_path)
+    c.post("/api/session")
+    data = _make_special_source_bytes()
+    up = c.post("/api/upload", files={"file": ("zrodlo.pdf", data, "application/pdf")})
+    assert up.status_code == 200
+
+    prep = c.post("/api/special/prepare", json={
+        "print_upload": "zrodlo.pdf", "print_page": 0,
+        "cut_upload": "zrodlo.pdf", "cut_page": 0,
+        "bleed_mm": 3.0,
+    })
+    assert prep.status_code == 200, prep.text
+    body = prep.json()
+    assert body["print_upload"] == "__special_print__.pdf"
+    assert body["cut_upload"] == "__special_cut__.pdf"
+    assert body["page_width_mm"] > 0 and body["page_height_mm"] > 0
+
+    job = c.post("/api/job", json={
+        "print_upload": body["print_upload"], "print_page": 0,
+        "cut_upload": body["cut_upload"], "cut_page": 0,
+        "item_w_mm": body["page_width_mm"], "item_h_mm": body["page_height_mm"],
+        "special_enabled": True,
+        "special_row_offsets_mm": [0.0, 0.0],
+        "special_col_offsets_mm": [0.0, 0.0],
+        "special_col_x_offsets_mm": [0.0, 0.0],
+        "special_row_y_offsets_mm": [0.0, 0.0],
+    })
+    assert job.status_code == 200, job.text
+    assert job.json()["count"] >= 1
+
+    prev = c.get("/api/preview/print.png")
+    assert prev.status_code == 200
+    assert prev.headers["content-type"] == "image/png"
+    assert len(prev.content) > 100
+
+    gen = c.post("/api/generate", json={"base_name": "spec"})
+    assert gen.status_code == 200
+    dl = c.get("/api/download/print")
+    assert dl.status_code == 200
+    assert dl.content[:4] == b"%PDF"
+
+
+def test_special_prepare_rejects_blank_page(tmp_path):
+    c = _client(tmp_path)
+    c.post("/api/session")
+    doc = fitz.open(); doc.new_page(width=100, height=100); data = doc.tobytes(); doc.close()
+    c.post("/api/upload", files={"file": ("blank.pdf", data, "application/pdf")})
+    prep = c.post("/api/special/prepare", json={
+        "print_upload": "blank.pdf", "print_page": 0,
+        "cut_upload": "blank.pdf", "cut_page": 0,
+        "bleed_mm": 3.0,
+    })
+    assert prep.status_code == 400
