@@ -1,12 +1,22 @@
 from __future__ import annotations
 
+from pathlib import Path
+
+from pydantic import BaseModel
+
 from fastapi import Depends, FastAPI, File, HTTPException, Request, Response, UploadFile
+from fastapi.responses import FileResponse
 from fastapi.responses import Response as RawResponse
 
+from summa_cut.export import generate_output_docs, save_output_docs
 from summa_cut.layout import compute_layout
 from web.job_builder import JobParams, build_job
 from web.preview_render import render_output_png
 from web.sessions import Session, SessionStore
+
+
+class GenerateParams(BaseModel):
+    base_name: str = "wynik"
 
 
 def create_app(store: SessionStore) -> FastAPI:
@@ -70,5 +80,31 @@ def create_app(store: SessionStore) -> FastAPI:
         job, layout = _job_and_layout(session)
         png = render_output_png(job, layout, which=which, max_px=900)
         return RawResponse(content=png, media_type="image/png")
+
+    @app.post("/api/generate")
+    def generate(body: GenerateParams, session: Session = Depends(current_session)) -> dict:
+        job, layout = _job_and_layout(session)
+        docs = generate_output_docs(job, layout)
+        try:
+            print_path, cut_path = save_output_docs(docs, session.workdir, base_name=body.base_name)
+        finally:
+            docs.print_doc.close()
+            docs.cut_doc.close()
+        session.job_params["_print_name"] = print_path.name
+        session.job_params["_cut_name"] = cut_path.name
+        return {"print_name": print_path.name, "cut_name": cut_path.name}
+
+    @app.get("/api/download/{which}")
+    def download(which: str, session: Session = Depends(current_session)) -> FileResponse:
+        if which not in ("print", "cut"):
+            raise HTTPException(status_code=404, detail="Nieznany plik.")
+        key = "_print_name" if which == "print" else "_cut_name"
+        name = (session.job_params or {}).get(key)
+        if not name:
+            raise HTTPException(status_code=404, detail="Najpierw wygeneruj wynik (/api/generate).")
+        path = Path(session.workdir) / name
+        if not path.is_file():
+            raise HTTPException(status_code=404, detail="Plik wyniku nie istnieje.")
+        return FileResponse(path, media_type="application/pdf", filename=name)
 
     return app

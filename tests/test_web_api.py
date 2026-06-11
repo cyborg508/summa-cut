@@ -103,3 +103,35 @@ def test_preview_bad_which_is_404(tmp_path):
     c.post("/api/job", json=_JOB)
     r = c.get("/api/preview/bok.png")
     assert r.status_code == 404
+
+
+def test_generate_then_download_pdfs(tmp_path):
+    c = _session_with_upload(tmp_path)
+    c.post("/api/job", json=_JOB)
+    r = c.post("/api/generate", json={"base_name": "moj_arkusz"})
+    assert r.status_code == 200
+    names = r.json()
+    assert names["print_name"] == "moj_arkusz_druk.pdf"
+    assert names["cut_name"] == "moj_arkusz_wykrojnik.pdf"
+
+    rp = c.get("/api/download/print")
+    assert rp.status_code == 200
+    assert rp.headers["content-type"] == "application/pdf"
+    assert rp.content[:5] == b"%PDF-"
+
+    rc = c.get("/api/download/cut")
+    assert rc.status_code == 200
+    assert rc.content[:5] == b"%PDF-"
+
+
+def test_generate_before_job_is_400(tmp_path):
+    c = _session_with_upload(tmp_path)
+    r = c.post("/api/generate", json={"base_name": "x"})
+    assert r.status_code == 400
+
+
+def test_download_before_generate_is_404(tmp_path):
+    c = _session_with_upload(tmp_path)
+    c.post("/api/job", json=_JOB)
+    r = c.get("/api/download/print")
+    assert r.status_code == 404
