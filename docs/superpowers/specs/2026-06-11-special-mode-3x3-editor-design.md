@@ -26,18 +26,18 @@ parametry pozostają jako **2×2 powtarzalne** (8 offsetów), **bez zmian w siln
    `use_special`). NIE robimy 9 niezależnych kafli.
 2. **Kafle z realną grafiką** przyciętego wykrojnika (nakładka druk+wykrojnik), jak
    desktop — backend zwraca jeden obraz kafla, front powiela go 9×.
-3. **Dwa tryby przeciągania**, oba wymagane (mapowanie 1:1 z desktopu):
-   - **Tryb „Zazębienie" (bez Shift):** poziomo → `row_offsets` (przesuwa środkowy
-     RZĄD względem rzędów 1 i 3), pionowo → `col_offsets` (przesuwa środkową KOLUMNĘ
-     względem kolumn 1 i 3).
-   - **Tryb „Odstęp" (z Shift):** poziomo → `col_x_offsets` (odstęp KOLUMN), pionowo →
-     `row_y_offsets` (odstęp RZĘDÓW).
-   - Tryb wybierany **widocznym przełącznikiem** (odkrywalność), a trzymanie **Shift**
-     działa jako skrót do trybu „Odstęp".
+3. **Dwa tryby przeciągania przez Shift — dokładnie jak oryginał** (mapowanie 1:1):
+   - **Bez Shift:** poziomo → `row_offsets` (przesuwa środkowy RZĄD względem rzędów 1
+     i 3), pionowo → `col_offsets` (przesuwa środkową KOLUMNĘ względem kolumn 1 i 3).
+   - **Z Shift:** poziomo → `col_x_offsets` (odstęp KOLUMN), pionowo → `row_y_offsets`
+     (odstęp RZĘDÓW).
+   - Brak przełącznika-przycisku — **sam modyfikator Shift**, jak w desktopie. Dla
+     odkrywalności **stała legenda na kanwie** (tekst: „Przeciągnij kafel: bez Shift =
+     przesuń rząd/kolumnę; z Shiftem = zmień odstęp rzędów/kolumn").
 4. **8 pól liczbowych** → zwijana sekcja „dostrojenie ręczne", dwukierunkowo
    zsynchronizowana z edytorem (kto chce wpisać dokładną wartość mm — dalej może).
-5. **Strzałki klawiatury** = drobny krok (0,5 mm) dla zaznaczonego kafla, w aktywnym
-   trybie.
+5. **Strzałki klawiatury** = drobny krok (0,1 mm) dla zaznaczonego kafla; bez Shift
+   przesuwa rząd/kolumnę, z Shiftem zmienia odstęp (spójnie z dragiem).
 6. **Żywy podgląd całego arkusza** (istniejący) odświeża się po puszczeniu kafla
    (throttle), a edytor 3×3 reaguje natychmiast (klient, bez serwera).
 
@@ -60,11 +60,11 @@ drag z Shift  : col_x_offsets[base(col)] += dx ;  row_y_offsets[base(row)] += dy
 
 ### 1. Backend — `GET /api/special/tile.png` (jedyna nowa rzecz w backendzie)
 
-- Zwraca PNG **jednego przygotowanego kafla**: nakładka strony druku i wykrojnika z
-  przyciętych PDF-ów sesji (`__special_print__.pdf` + `__special_cut__.pdf`, które już
-  istnieją po `/api/special/prepare`).
-- Rasteryzacja przez istniejący stos fitz (jak `web/preview_render.py`). Wykrojnik
-  rysowany półprzezroczyście na druku, żeby było widać obrys.
+- Zwraca PNG **jednego przygotowanego kafla**: **pełna grafika druku** z **nałożonym
+  na wierzchu obrysem wykrojnika** z przyciętych PDF-ów sesji (`__special_print__.pdf`
+  + `__special_cut__.pdf`, które już istnieją po `/api/special/prepare`).
+- Rasteryzacja przez istniejący stos fitz (jak `web/preview_render.py`): najpierw druk,
+  potem strona wykrojnika nałożona na wierzch (obrys widoczny nad drukiem).
 - Wymaga przygotowanej sesji specjalnej: jeśli brak przyciętych uploadów → **400**
   z jasnym komunikatem (spójnie z resztą tras, np. `/api/special/prepare`).
 - Brak zmian w: `prepare_special_trim`, `job_builder`, `SpecialModePattern`, silniku,
@@ -79,12 +79,12 @@ drag z Shift  : col_x_offsets[base(col)] += dx ;  row_y_offsets[base(row)] += dy
   na pozycjach z portu `_preview_tile_origin`. Środek wyróżniony; powtórki przygaszone.
   Skala dobierana do bounding-boxa 9 kafli (jak desktop `_layout_metrics`).
 - **Interakcja:** `pointerdown` na kaflu zaznacza i startuje drag; `pointermove`
-  aktualizuje offsety wg trybu (mapowanie wyżej) i przerysowuje SVG natychmiast;
+  aktualizuje offsety wg stanu Shift (mapowanie wyżej) i przerysowuje SVG natychmiast;
   `pointerup` kończy, throttle → `/api/job` + odświeżenie podglądu arkusza.
-- **Przełącznik trybu:** dwa przyciski „Zazębienie" / „Odstęp"; Shift wciśnięty w
-  trakcie drag tymczasowo wymusza „Odstęp".
-- **Strzałki:** gdy kafel zaznaczony, ←↑↓→ zmieniają właściwy offset o 0,5 mm w aktywnym
-  trybie.
+- **Shift:** trzymany w trakcie drag (lub strzałek) przełącza z przesuwu rzędu/kolumny
+  na zmianę odstępu — jak oryginał. Stała legenda na kanwie wyjaśnia oba gesty.
+- **Strzałki:** gdy kafel zaznaczony, ←↑↓→ zmieniają właściwy offset o **0,1 mm** (bez
+  Shift = przesuń rząd/kolumnę; z Shiftem = odstęp).
 - **Sekcja „dostrojenie ręczne" (zwijana):** dotychczasowe 8 pól; zmiana pola →
   aktualizuje stan i SVG; drag → aktualizuje pola. Jedno źródło prawdy = obiekt stanu.
 - **Integracja:** `collectParams()` bez zmian merytorycznych — dalej wysyła 4 listy
@@ -111,7 +111,7 @@ jeden endpoint podglądu kafla.
 - **pytest:**
   - `/api/special/tile.png` zwraca `image/png` o niezerowym rozmiarze po prepare;
     zwraca 400 bez przygotowanej sesji specjalnej.
-  - Kontrakt id-ów nowego edytora w `index.html` (kontener 3×3, przyciski trybu,
+  - Kontrakt id-ów nowego edytora w `index.html` (kontener 3×3, legenda gestów,
     sekcja „dostrojenie ręczne", 8 pól nadal obecne w zwijanej sekcji).
   - `node --check web/static/app.js`.
 - **Czysta funkcja mapowania:** logikę `tileOrigin(row,col,offsets,pageW,pageH)` i
@@ -120,8 +120,8 @@ jeden endpoint podglądu kafla.
 - **Playwright (plugin `example-skills:webapp-testing`):** smoke E2E przeciw żywemu
   uvicornowi — po prepare: drag środkowego kafla w trybie „Zazębienie" zmienia
   `row_offsets`/`col_offsets` (widoczne w polach „dostrojenie ręczne") i zmienia liczbę
-  użytków z `/api/job`; przełączenie na „Odstęp" + drag zmienia `col_x_offsets`/
-  `row_y_offsets`. To domyka lukę warstwy drag/JS, której pytest nie łapie.
+  użytków z `/api/job`; drag z wciśniętym Shift zmienia `col_x_offsets`/`row_y_offsets`.
+  To domyka lukę warstwy drag/JS, której pytest nie łapie.
 
 ## Poza zakresem (YAGNI)
 
