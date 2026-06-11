@@ -44,8 +44,6 @@ class JobParams(BaseModel):
     montage: list[MontageItemParams] = Field(default_factory=list)
 
     special_enabled: bool = False
-    special_page_w_mm: float = 0.0
-    special_page_h_mm: float = 0.0
     special_row_offsets_mm: list[float] = Field(default_factory=lambda: [0.0, 0.0])
     special_col_offsets_mm: list[float] = Field(default_factory=lambda: [0.0, 0.0])
     special_col_x_offsets_mm: list[float] = Field(default_factory=lambda: [0.0, 0.0])
@@ -116,6 +114,10 @@ def _build_special_job(params: JobParams, session: Session) -> JobSettings:
         cut_page=cut_page,
         print_page_size_mm=print_info.page_sizes_mm[params.print_page],
         cut_page_size_mm=cut_info.page_sizes_mm[params.cut_page],
+        # Uwaga: w trybie specjalnym eksport renderuje całą stronę źródłową
+        # (use_special → pełnostronicowy clip w export.py:_render_cell_stamp),
+        # więc poniższe wartości content-size / content-bbox są przekazywane
+        # przelotowo, ale NIE są używane przez ścieżkę eksportu trybu specjalnego.
         print_content_size_mm=print_info.page_content_sizes_mm[params.print_page],
         cut_content_size_mm=cut_info.page_content_sizes_mm[params.cut_page],
         print_content_bbox_pt=print_info.page_content_boxes_pt[params.print_page],
@@ -132,7 +134,7 @@ def _build_special_job(params: JobParams, session: Session) -> JobSettings:
 
 
 def build_job(params: JobParams, session: Session) -> JobSettings:
-    if params.item_w_mm <= 0 or params.item_h_mm <= 0:
+    if not params.special_enabled and (params.item_w_mm <= 0 or params.item_h_mm <= 0):
         raise ValueError("Rozmiar użytku musi być większy od zera.")
     if params.sheet_w_mm <= 0 or params.sheet_h_mm <= 0:
         raise ValueError("Rozmiar arkusza musi być większy od zera.")

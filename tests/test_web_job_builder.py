@@ -194,7 +194,6 @@ def test_build_job_special_mode_sets_pattern(tmp_path):
         cut_upload="__special_cut__.pdf", cut_page=0,
         item_w_mm=56.4, item_h_mm=35.3,
         special_enabled=True,
-        special_page_w_mm=56.4, special_page_h_mm=35.3,
         special_row_offsets_mm=[0.0, 2.0],
         special_col_offsets_mm=[0.0, 0.0],
         special_col_x_offsets_mm=[0.0, 0.0],
@@ -210,6 +209,42 @@ def test_build_job_special_mode_sets_pattern(tmp_path):
     assert job.cut_page.pdf_path.endswith("__special_cut__.pdf")
 
 
+def test_build_job_special_pads_offsets_and_derives_item_size(tmp_path):
+    from web.job_builder import JobParams, build_job
+    from web.sessions import SessionStore
+
+    store = SessionStore(tmp_path, ttl_seconds=3600)
+    session = store.create()
+    import fitz
+    for name in ("__special_print__.pdf", "__special_cut__.pdf"):
+        doc = fitz.open()
+        doc.new_page(width=160.0, height=100.0)  # ~56.4 x 35.3 mm
+        data = doc.tobytes()
+        doc.close()
+        store.save_upload(session, name, data)
+
+    params = JobParams(
+        print_upload="__special_print__.pdf", print_page=0,
+        cut_upload="__special_cut__.pdf", cut_page=0,
+        item_w_mm=1.0, item_h_mm=1.0,  # klient — ignorowane w trybie specjalnym
+        special_enabled=True,
+        special_row_offsets_mm=[1.0, 2.0, 9.0],   # 3 elementy → obcięte do 2
+        special_col_offsets_mm=[],                # puste → dopełnione zerami
+        special_col_x_offsets_mm=[3.0, 4.0],      # zachowane verbatim
+        special_row_y_offsets_mm=[5.0, 6.0],      # zachowane verbatim
+    )
+    job = build_job(params, session)
+    pattern = job.special_mode_pattern
+    assert pattern is not None
+    assert pattern.row_offsets_mm == [1.0, 2.0]
+    assert pattern.col_offsets_mm == [0.0, 0.0]
+    assert pattern.col_x_offsets_mm == [3.0, 4.0]
+    assert pattern.row_y_offsets_mm == [5.0, 6.0]
+    # rozmiar użytku pochodzi z przyciętego PDF (160 pt), NIE z item_w_mm=1.0
+    assert job.item_spec.width_mm == pytest.approx(160.0 * MM_PER_POINT, abs=0.1)
+    assert job.item_spec.width_mm == pytest.approx(56.4, abs=0.1)
+
+
 def test_build_job_special_requires_cut_upload(tmp_path):
     from web.job_builder import JobParams, build_job
     from web.sessions import SessionStore
@@ -223,7 +258,7 @@ def test_build_job_special_requires_cut_upload(tmp_path):
         print_upload="__special_print__.pdf", print_page=0,
         cut_upload=None, cut_page=None,
         item_w_mm=30, item_h_mm=30,
-        special_enabled=True, special_page_w_mm=30, special_page_h_mm=30,
+        special_enabled=True,
     )
     with pytest.raises(ValueError):
         build_job(params, session)
