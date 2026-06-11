@@ -192,12 +192,18 @@ async function updatePreview() {
 }
 
 // Nazwa bazowa proponowana z pliku DRUKU (montaż: pierwszy użytek), bez .pdf.
+// Gdy nie wybrano jawnie pliku druku, bierze pierwszy wgrany plik — żeby nazwa
+// NIE spadała do "wynik", dopóki cokolwiek jest wgrane.
 function computeBase() {
   let name = "";
   if ($("montage-enable").checked && montage.length && montage[0].print_upload) {
     name = montage[0].print_upload;
   } else {
     name = $("print-file").value;
+  }
+  if (!name) {
+    const keys = Object.keys(uploads);
+    if (keys.length) name = keys[0];
   }
   name = (name || "wynik").replace(/\.pdf$/i, "").trim();
   return name || "wynik";
@@ -216,11 +222,14 @@ async function doGenerate() {
     showError((await r.json()).detail || "Błąd generowania (najpierw ustaw poprawny układ).");
     return;
   }
+  // Nazwy bierzemy z JEDNEJ odpowiedzi serwera — druk i wykrojnik mają zawsze
+  // ten sam rdzeń, więc nie mogą się rozjechać.
+  const names = await r.json();   // { print_name, cut_name }
   clearError();
   try {
-    await saveOne("print", `${base}_druk.pdf`);
-    await saveOne("cut", `${base}_wykrojnik.pdf`);
-    $("summary").textContent = `Zapisano: ${base}_druk.pdf + ${base}_wykrojnik.pdf`;
+    await saveOne("print", names.print_name);
+    await saveOne("cut", names.cut_name);
+    $("summary").textContent = `Zapisano: ${names.print_name} + ${names.cut_name}`;
   } catch (e) {
     if (e && e.name === "AbortError") { $("summary").textContent = "Zapis anulowany."; return; }
     showError("Błąd zapisu plików: " + ((e && e.message) || e));
@@ -229,29 +238,39 @@ async function doGenerate() {
 
 // Pobiera wygenerowany plik i zapisuje go. Gdy dostępne (HTTPS/localhost) —
 // prawdziwe okno „Zapisz jako" z proponowaną nazwą i wyborem lokalizacji;
-// w przeciwnym razie zwykłe pobranie z poprawną nazwą.
+// w przeciwnym razie (lub gdy okno zawiedzie, np. utrata user-gesture przy
+// drugim pliku) zwykłe pobranie z poprawną nazwą.
 async function saveOne(which, filename) {
   const resp = await fetch(`/api/download/${which}?t=${Date.now()}`);
   if (!resp.ok) throw new Error(`pobranie „${which}" nieudane`);
   const blob = await resp.blob();
   if (window.showSaveFilePicker) {
-    const handle = await window.showSaveFilePicker({
-      suggestedName: filename,
-      types: [{ description: "PDF", accept: { "application/pdf": [".pdf"] } }],
-    });
-    const w = await handle.createWritable();
-    await w.write(blob);
-    await w.close();
-  } else {
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = filename;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    URL.revokeObjectURL(url);
+    try {
+      const handle = await window.showSaveFilePicker({
+        suggestedName: filename,
+        types: [{ description: "PDF", accept: { "application/pdf": [".pdf"] } }],
+      });
+      const w = await handle.createWritable();
+      await w.write(blob);
+      await w.close();
+      return;
+    } catch (e) {
+      if (e && e.name === "AbortError") throw e;   // użytkownik anulował → przerwij
+      // inny błąd (np. utrata aktywacji przy 2. pliku) → fallback na zwykłe pobranie
+    }
   }
+  downloadBlob(blob, filename);
+}
+
+function downloadBlob(blob, filename) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
 }
 
 function showError(msg) { const e = $("error"); e.textContent = msg; e.hidden = false; }
