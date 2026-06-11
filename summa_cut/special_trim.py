@@ -105,6 +105,9 @@ def extract_cut_outline(page: fitz.Page):
                 shapes.append(fixed)
     if not shapes:
         raise ValueError("Nie udało się znaleźć wektorowego obrysu wykrojnika na wybranej stronie.")
+    # Świadomie używamy sumy logicznej (unary_union) zamiast even-odd QPainterPath.simplified()
+    # z desktopu — to odporniejszy zamiennik. Dla prostych obrysów wyniki są zgodne; dla
+    # samoprzecinających się / zagnieżdżonych (z dziurami) mogą się różnić (union vs even-odd).
     union = unary_union(shapes)
     if union.is_empty or union.area <= 0:
         raise ValueError("Obrys wykrojnika jest pusty.")
@@ -171,16 +174,18 @@ def _save_vector_trim_pdf(
     if width <= 0 or height <= 0:
         raise ValueError("Obrys wykrojnika po dodaniu spadu jest pusty.")
     out_doc = fitz.open()
-    out_page = out_doc.new_page(width=width, height=height)
-    target_rect = fitz.Rect(-minx, -miny, page_rect.width - minx, page_rect.height - miny)
-    out_page.show_pdf_page(target_rect, source_doc, source_page_index)
-    content_xrefs = out_page.get_contents()
-    if not content_xrefs:
-        raise ValueError("Nie udało się utworzyć treści strony wynikowej PDF.")
-    clip_stream = _clip_commands(geom, out_page, minx, miny).encode("ascii")
-    out_doc.update_stream(content_xrefs[0], clip_stream)
-    out_doc.save(str(output_path))
-    out_doc.close()
+    try:
+        out_page = out_doc.new_page(width=width, height=height)
+        target_rect = fitz.Rect(-minx, -miny, page_rect.width - minx, page_rect.height - miny)
+        out_page.show_pdf_page(target_rect, source_doc, source_page_index)
+        content_xrefs = out_page.get_contents()
+        if not content_xrefs:
+            raise ValueError("Nie udało się utworzyć treści strony wynikowej PDF.")
+        clip_stream = _clip_commands(geom, out_page, minx, miny).encode("ascii")
+        out_doc.update_stream(content_xrefs[0], clip_stream)
+        out_doc.save(str(output_path))
+    finally:
+        out_doc.close()
     return width, height
 
 

@@ -5,14 +5,14 @@ from pathlib import Path
 import fitz
 import pytest
 
+from summa_cut.pdf_io import MM_PER_POINT
 from summa_cut.special_trim import (
+    POINTS_PER_MM,
     drawings_to_polygons,
     extract_cut_outline,
     expand_outline,
     prepare_special_trim,
 )
-
-POINTS_PER_MM = 72.0 / 25.4
 
 
 def _make_source_pdf(path: Path) -> None:
@@ -101,6 +101,68 @@ def test_prepare_special_trim_raises_on_no_vector_outline(tmp_path: Path):
             cut_pdf_path=str(blank), cut_page=0,
             bleed_mm=3.0, out_dir=out,
         )
+
+
+def _make_two_rects_cut_pdf(path: Path) -> None:
+    """Strona wykrojnika z DWOMA rozłącznymi prostokątnymi obrysami (kreska).
+
+    Po extract_cut_outline + expand_outline (bez spadu) daje to geometrię
+    MultiPolygon (dwa osobne wielokąty), więc test przechodzi przez gałąź
+    getattr(geom, 'geoms') w _geom_rings."""
+    doc = fitz.open()
+    page = doc.new_page(width=160.0, height=100.0)
+    # dwa rozłączne obrysy wykrojnika (kreska), z przerwą 40 pt między nimi
+    page.draw_rect(fitz.Rect(20, 20, 60, 60), color=(1, 0, 0), width=0.5)
+    page.draw_rect(fitz.Rect(100, 20, 140, 60), color=(1, 0, 0), width=0.5)
+    doc.save(str(path))
+    doc.close()
+
+
+def _make_full_fill_print_pdf(path: Path) -> None:
+    """Strona druku z szarym wypełnieniem na całej szerokości obejmującej oba prostokąty."""
+    doc = fitz.open()
+    page = doc.new_page(width=160.0, height=100.0)
+    page.draw_rect(fitz.Rect(20, 20, 140, 60), color=None, fill=(0.6, 0.6, 0.6), width=0.0)
+    doc.save(str(path))
+    doc.close()
+
+
+def test_prepare_special_trim_multipolygon_punches_gap(tmp_path: Path):
+    import numpy as np
+
+    cut = tmp_path / "cut.pdf"
+    prt = tmp_path / "print.pdf"
+    _make_two_rects_cut_pdf(cut)
+    _make_full_fill_print_pdf(prt)
+    out = tmp_path / "out"
+    out.mkdir()
+
+    # bez spadu, żeby przerwa między prostokątami nie zlała się po buforze
+    result = prepare_special_trim(
+        print_pdf_path=str(prt), print_page=0,
+        cut_pdf_path=str(cut), cut_page=0,
+        bleed_mm=0.0, out_dir=out,
+    )
+    assert result.print_path.is_file()
+    assert result.cut_path.is_file()
+    assert result.page_width_mm > 0
+    assert result.page_height_mm > 0
+    # MultiPolygon: bounding box obejmuje oba prostokąty (szer. 120 pt @ 0 spadu)
+    assert result.page_width_mm == pytest.approx(120.0 * MM_PER_POINT, abs=0.5)
+
+    # render druku: w pasie między prostokątami clip powinien wyciąć treść (prawie biało)
+    scale = 2.0
+    doc = fitz.open(str(result.print_path))
+    try:
+        pix = doc[0].get_pixmap(matrix=fitz.Matrix(scale, scale), alpha=False)
+        arr = np.frombuffer(pix.samples, dtype=np.uint8).reshape(pix.height, pix.width, pix.n)
+        gray = arr.mean(axis=2)
+    finally:
+        doc.close()
+    # środek strony w poziomie = przerwa między prostokątami; bierzemy pionowy pas
+    h, w = gray.shape
+    mid = gray[:, int(w * 0.45):int(w * 0.55)]
+    assert (mid > 240).any(), "w przerwie między prostokątami brak prawie-białych pikseli (clip nie wyciął dziury)"
 
 
 import os
