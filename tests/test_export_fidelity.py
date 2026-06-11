@@ -73,3 +73,25 @@ def test_fidelity_gapless(source_pdf):
         _assert_matches_golden(docs.cut_doc, "golden_cut_gapless.png")
     finally:
         docs.print_doc.close(); docs.cut_doc.close()
+
+
+def test_show_pdf_page_called_once_per_unique_cell(source_pdf, monkeypatch):
+    """Jednolita siatka = 1 unikalna komórka → render źródła najwyżej 2x
+    (druk + wykrojnik), niezależnie od liczby użytków."""
+    job = _job(source_pdf, gap_enabled=True, item=30.0)
+    layout = compute_layout(job)
+    assert layout.count > 50
+
+    calls = {"n": 0}
+    real = fitz.Page.show_pdf_page
+
+    def spy(self, *a, **k):
+        calls["n"] += 1
+        return real(self, *a, **k)
+
+    monkeypatch.setattr(fitz.Page, "show_pdf_page", spy)
+    docs = E.generate_output_docs(job, layout)
+    try:
+        assert calls["n"] <= 2, f"show_pdf_page wołane {calls['n']}x (brak deduplikacji)"
+    finally:
+        docs.print_doc.close(); docs.cut_doc.close()
