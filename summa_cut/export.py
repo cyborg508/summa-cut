@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from io import BytesIO
 from pathlib import Path
 
 import fitz
+import pikepdf
 
 from .models import JobSettings, LayoutResult, MontageItem, Placement
 from .opos import get_opos_positions
@@ -84,31 +86,6 @@ class _SourceCache:
         self._docs.clear()
 
 
-def _place_pdf_page(
-    target_page: fitz.Page,
-    src: fitz.Document,
-    source_page_index: int,
-    content_bbox_pt: tuple[float, float, float, float],
-    placement: Placement,
-    use_full_page: bool = False,
-) -> None:
-    src_page = src[source_page_index]
-    clip_rect = src_page.rect if use_full_page else _centered_clip_rect_pt(
-        src_page.rect,
-        content_bbox_pt,
-        placement.width_mm,
-        placement.height_mm,
-        placement.rotation_deg,
-    )
-    rect = _rect_mm_to_pt(
-        placement.x_mm,
-        placement.y_mm,
-        placement.width_mm,
-        placement.height_mm,
-    )
-    target_page.show_pdf_page(rect, src, source_page_index, rotate=placement.rotation_deg, clip=clip_rect)
-
-
 def _resolve_print_source(job: JobSettings, placement: Placement) -> tuple[str, int, tuple[float, float, float, float]]:
     if job.montage_items:
         item: MontageItem = job.montage_items[min(max(placement.montage_item_index, 0), len(job.montage_items) - 1)]
@@ -122,6 +99,91 @@ def _resolve_cut_source(job: JobSettings, placement: Placement) -> tuple[str, in
         return item.cut_page.pdf_path, item.cut_page.page_index, item.cut_content_bbox_pt
     return job.cut_page.pdf_path, job.cut_page.page_index, job.cut_content_bbox_pt
 
+
+def _placement_signature(
+    source_path: str,
+    page_index: int,
+    content_bbox_pt: tuple[float, float, float, float],
+    placement: Placement,
+    use_full_page: bool,
+) -> tuple:
+    """Klucz identyczności RYSUNKU komórki — bez pozycji (x,y/group/index).
+
+    Dwa użytki o tej samej sygnaturze rysują piksel w piksel to samo, więc
+    stempel renderujemy raz i tylko przesuwamy."""
+    return (
+        source_path,
+        page_index,
+        content_bbox_pt,
+        round(placement.width_mm, 4),
+        round(placement.height_mm, 4),
+        placement.rotation_deg,
+        use_full_page,
+    )
+
+
+def _render_cell_stamp(
+    src: fitz.Document,
+    page_index: int,
+    content_bbox_pt: tuple[float, float, float, float],
+    width_mm: float,
+    height_mm: float,
+    rotation_deg: int,
+    use_full_page: bool,
+) -> bytes:
+    """Jednostronicowy PDF rozmiaru komórki z osadzonym źródłem w (0,0).
+
+    Używa istniejącej ścieżki show_pdf_page (identyczny render jak dawniej),
+    ale TYLKO raz na unikalną sygnaturę."""
+    cell_w_pt = mm_to_pt(width_mm)
+    cell_h_pt = mm_to_pt(height_mm)
+    src_page = src[page_index]
+    clip_rect = src_page.rect if use_full_page else _centered_clip_rect_pt(
+        src_page.rect, content_bbox_pt, width_mm, height_mm, rotation_deg,
+    )
+    with fitz.open() as stamp:
+        page = stamp.new_page(width=cell_w_pt, height=cell_h_pt)
+        page.show_pdf_page(
+            fitz.Rect(0, 0, cell_w_pt, cell_h_pt),
+            src, page_index, rotate=rotation_deg, clip=clip_rect,
+        )
+        return stamp.tobytes()
+
+
+def _stamp_placements_pikepdf(
+    base_pdf_bytes: bytes,
+    sheet_height_mm: float,
+    stamp_bytes_by_sig: dict[tuple, bytes],
+    placements_with_sig: list[tuple[Placement, tuple]],
+) -> bytes:
+    """Na stronę bazową (krata/puste, bez OPOS) nakłada stemple przez overlay.
+
+    Konwersja układu współrzędnych: nasze mm mają origin w LEWYM-GÓRNYM rogu,
+    PDF w LEWYM-DOLNYM → odbicie osi Y."""
+    sheet_h_pt = mm_to_pt(sheet_height_mm)
+    base = pikepdf.Pdf.open(BytesIO(base_pdf_bytes))
+    target_page = base.pages[0]
+    stamp_pdfs: dict[tuple, pikepdf.Pdf] = {}
+    try:
+        for placement, sig in placements_with_sig:
+            sp = stamp_pdfs.get(sig)
+            if sp is None:
+                sp = pikepdf.Pdf.open(BytesIO(stamp_bytes_by_sig[sig]))
+                stamp_pdfs[sig] = sp
+            x0 = mm_to_pt(placement.x_mm)
+            w = mm_to_pt(placement.width_mm)
+            h = mm_to_pt(placement.height_mm)
+            y_top = mm_to_pt(placement.y_mm)
+            lly = sheet_h_pt - (y_top + h)
+            rect = pikepdf.Rectangle(x0, lly, x0 + w, lly + h)
+            target_page.add_overlay(sp.pages[0], rect)
+        out = BytesIO()
+        base.save(out)
+        return out.getvalue()
+    finally:
+        for sp in stamp_pdfs.values():
+            sp.close()
+        base.close()
 
 
 def _draw_generated_cut_grid(page: fitz.Page, layout: LayoutResult) -> None:
@@ -156,42 +218,64 @@ def _draw_generated_cut_grid(page: fitz.Page, layout: LayoutResult) -> None:
 
 def generate_output_docs(job: JobSettings, layout: LayoutResult) -> OutputDocs:
     page_rect = _rect_mm_to_pt(0, 0, job.sheet_spec.width_mm, job.sheet_spec.height_mm)
-    print_doc = fitz.open()
-    cut_doc = fitz.open()
-    print_page = print_doc.new_page(width=page_rect.width, height=page_rect.height)
-    cut_page = cut_doc.new_page(width=page_rect.width, height=page_rect.height)
-
     use_special = bool(job.special_mode_pattern and job.special_mode_pattern.enabled)
+
+    # 1) BAZA (fitz): puste strony; na wykrojniku krata gdy gapless. Bez OPOS.
+    with fitz.open() as print_base, fitz.open() as cut_base:
+        print_base.new_page(width=page_rect.width, height=page_rect.height)
+        cut_base_page = cut_base.new_page(width=page_rect.width, height=page_rect.height)
+        if job.generate_cut_grid:
+            _draw_generated_cut_grid(cut_base_page, layout)
+        print_base_bytes = print_base.tobytes()
+        cut_base_bytes = cut_base.tobytes()
+
+    # 2) Render unikalnych stempli RAZ + lista (placement, sygnatura).
     sources = _SourceCache()
+    print_stamps: dict[tuple, bytes] = {}
+    cut_stamps: dict[tuple, bytes] = {}
+    print_list: list[tuple[Placement, tuple]] = []
+    cut_list: list[tuple[Placement, tuple]] = []
     try:
         for placement in layout.placements:
-            print_path, print_page_index, print_bbox = _resolve_print_source(job, placement)
-            _place_pdf_page(
-                print_page,
-                sources.get(print_path),
-                print_page_index,
-                print_bbox,
-                placement,
-                use_full_page=use_special,
-            )
-            if not job.generate_cut_grid:
-                cut_path, cut_page_index, cut_bbox = _resolve_cut_source(job, placement)
-                _place_pdf_page(
-                    cut_page,
-                    sources.get(cut_path),
-                    cut_page_index,
-                    cut_bbox,
-                    placement,
-                    use_full_page=use_special,
+            p_path, p_idx, p_bbox = _resolve_print_source(job, placement)
+            sig = _placement_signature(p_path, p_idx, p_bbox, placement, use_special)
+            if sig not in print_stamps:
+                print_stamps[sig] = _render_cell_stamp(
+                    sources.get(p_path), p_idx, p_bbox,
+                    placement.width_mm, placement.height_mm,
+                    placement.rotation_deg, use_special,
                 )
+            print_list.append((placement, sig))
+
+            if not job.generate_cut_grid:
+                c_path, c_idx, c_bbox = _resolve_cut_source(job, placement)
+                csig = _placement_signature(c_path, c_idx, c_bbox, placement, use_special)
+                if csig not in cut_stamps:
+                    cut_stamps[csig] = _render_cell_stamp(
+                        sources.get(c_path), c_idx, c_bbox,
+                        placement.width_mm, placement.height_mm,
+                        placement.rotation_deg, use_special,
+                    )
+                cut_list.append((placement, csig))
     finally:
         sources.close()
 
+    # 3) Montaż stempli (pikepdf).
+    print_bytes = _stamp_placements_pikepdf(
+        print_base_bytes, job.sheet_spec.height_mm, print_stamps, print_list,
+    )
     if job.generate_cut_grid:
-        _draw_generated_cut_grid(cut_page, layout)
+        cut_bytes = cut_base_bytes
+    else:
+        cut_bytes = _stamp_placements_pikepdf(
+            cut_base_bytes, job.sheet_spec.height_mm, cut_stamps, cut_list,
+        )
 
-    _draw_opos(print_page, job)
-    _draw_opos(cut_page, job)
+    # 4) OPOS na wierzchu (fitz).
+    print_doc = fitz.open("pdf", print_bytes)
+    cut_doc = fitz.open("pdf", cut_bytes)
+    _draw_opos(print_doc[0], job)
+    _draw_opos(cut_doc[0], job)
     return OutputDocs(print_doc=print_doc, cut_doc=cut_doc)
 
 
