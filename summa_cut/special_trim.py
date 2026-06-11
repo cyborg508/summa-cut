@@ -15,6 +15,9 @@ POINTS_PER_MM = 1.0 / MM_PER_POINT
 # Liczba odcinków, na które dzielimy krzywą Béziera przy spłaszczaniu do wielokąta.
 _BEZIER_STEPS = 16
 
+SPECIAL_PRINT_NAME = "__special_print__.pdf"
+SPECIAL_CUT_NAME = "__special_cut__.pdf"
+
 
 @dataclass
 class SpecialTrimResult:
@@ -208,8 +211,8 @@ def prepare_special_trim(
         print_page_obj = print_doc[print_page]
         outline = extract_cut_outline(cut_page_obj)
         expanded = expand_outline(outline, bleed_mm * POINTS_PER_MM)
-        out_print = work_dir / "__special_print__.pdf"
-        out_cut = work_dir / "__special_cut__.pdf"
+        out_print = work_dir / SPECIAL_PRINT_NAME
+        out_cut = work_dir / SPECIAL_CUT_NAME
         w_pt, h_pt = _save_vector_trim_pdf(out_print, print_doc, print_page, expanded, print_page_obj.rect)
         _save_vector_trim_pdf(out_cut, cut_doc, cut_page, expanded, cut_page_obj.rect)
         return SpecialTrimResult(
