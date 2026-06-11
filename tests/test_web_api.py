@@ -135,3 +135,47 @@ def test_download_before_generate_is_404(tmp_path):
     c.post("/api/job", json=_JOB)
     r = c.get("/api/download/print")
     assert r.status_code == 404
+
+
+def test_montage_job_preview_generate_download(tmp_path):
+    c = _client(tmp_path)
+    c.post("/api/session")
+    c.post("/api/upload", files={"file": ("a.pdf", _pdf_bytes(), "application/pdf")})
+    c.post("/api/upload", files={"file": ("b.pdf", _pdf_bytes(), "application/pdf")})
+
+    job = {
+        "print_upload": "a.pdf", "print_page": 0, "cut_upload": "a.pdf", "cut_page": 0,
+        "sheet_w_mm": 330.0, "sheet_h_mm": 480.0, "item_w_mm": 30.0, "item_h_mm": 30.0,
+        "gap_enabled": True, "gap_mm": 3.0,
+        "montage": [
+            {"label": "A", "print_upload": "a.pdf", "print_page": 0, "cut_upload": "a.pdf", "cut_page": 0, "quantity": 4},
+            {"label": "B", "print_upload": "b.pdf", "print_page": 0, "cut_upload": "b.pdf", "cut_page": 0, "quantity": 2},
+        ],
+    }
+    r = c.post("/api/job", json=job)
+    assert r.status_code == 200
+    body = r.json()
+    assert body["requested_count"] == 6
+    assert body["count"] == 6
+
+    rp = c.get("/api/preview/print.png")
+    assert rp.status_code == 200 and rp.content[:8] == b"\x89PNG\r\n\x1a\n"
+
+    rg = c.post("/api/generate", json={"base_name": "montaz"})
+    assert rg.status_code == 200
+    assert rg.json()["print_name"] == "montaz_druk.pdf"
+    rd = c.get("/api/download/print")
+    assert rd.status_code == 200 and rd.content[:5] == b"%PDF-"
+
+
+def test_montage_bad_upload_is_400(tmp_path):
+    c = _client(tmp_path)
+    c.post("/api/session")
+    c.post("/api/upload", files={"file": ("a.pdf", _pdf_bytes(), "application/pdf")})
+    job = {
+        "print_upload": "a.pdf", "print_page": 0, "cut_upload": "a.pdf", "cut_page": 0,
+        "item_w_mm": 30.0, "item_h_mm": 30.0, "gap_enabled": True, "gap_mm": 3.0,
+        "montage": [{"print_upload": "brak.pdf", "print_page": 0, "cut_upload": "a.pdf", "cut_page": 0, "quantity": 1}],
+    }
+    r = c.post("/api/job", json=job)
+    assert r.status_code == 400

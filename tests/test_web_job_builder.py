@@ -94,3 +94,81 @@ def test_opos_offsets_passed_through(tmp_path):
     assert job.opos_spec.side_offset_mm == 12.0
     assert job.opos_spec.bottom_offset_mm == 8.0
     assert job.opos_spec.top_offset_mm == 35.0
+
+
+def _session_with_two_pdfs(tmp_path):
+    store = SessionStore(base_dir=tmp_path)
+    s = store.create()
+    store.save_upload(s, "a.pdf", _pdf_bytes())
+    store.save_upload(s, "b.pdf", _pdf_bytes())
+    return s
+
+
+def _montage_params(items, **over) -> JobParams:
+    base = dict(
+        print_upload="a.pdf", print_page=0, cut_upload="a.pdf", cut_page=0,
+        sheet_w_mm=330.0, sheet_h_mm=480.0, item_w_mm=30.0, item_h_mm=30.0,
+        gap_enabled=True, gap_mm=3.0, montage=items,
+    )
+    base.update(over)
+    return JobParams(**base)
+
+
+def test_montage_builds_items_with_quantities(tmp_path):
+    s = _session_with_two_pdfs(tmp_path)
+    params = _montage_params([
+        {"label": "A", "print_upload": "a.pdf", "print_page": 0, "cut_upload": "a.pdf", "cut_page": 0, "quantity": 3},
+        {"label": "B", "print_upload": "b.pdf", "print_page": 0, "cut_upload": "b.pdf", "cut_page": 0, "quantity": 2},
+    ])
+    job = build_job(params, s)
+    assert len(job.montage_items) == 2
+    assert [it.quantity for it in job.montage_items] == [3, 2]
+    assert job.montage_items[0].label == "A"
+    layout = compute_layout(job)
+    assert layout.requested_count == 5
+    assert layout.count == 5  # mieści się w arkuszu
+    assert sorted(p.montage_item_index for p in layout.placements) == [0, 0, 0, 1, 1]
+
+
+def test_montage_base_fields_taken_from_first_item(tmp_path):
+    s = _session_with_two_pdfs(tmp_path)
+    params = _montage_params([
+        {"print_upload": "b.pdf", "print_page": 0, "cut_upload": "b.pdf", "cut_page": 0, "quantity": 1},
+    ])
+    job = build_job(params, s)
+    assert job.print_page.pdf_path.endswith("b.pdf")
+    assert job.cut_page.pdf_path.endswith("b.pdf")
+
+
+def test_montage_unknown_upload_raises(tmp_path):
+    s = _session_with_two_pdfs(tmp_path)
+    params = _montage_params([
+        {"print_upload": "brak.pdf", "print_page": 0, "cut_upload": "a.pdf", "cut_page": 0, "quantity": 1},
+    ])
+    with pytest.raises(ValueError):
+        build_job(params, s)
+
+
+def test_montage_zero_quantity_raises(tmp_path):
+    s = _session_with_two_pdfs(tmp_path)
+    params = _montage_params([
+        {"print_upload": "a.pdf", "print_page": 0, "cut_upload": "a.pdf", "cut_page": 0, "quantity": 0},
+    ])
+    with pytest.raises(ValueError):
+        build_job(params, s)
+
+
+def test_montage_empty_list_uses_single_product_path(tmp_path):
+    s = _session_with_two_pdfs(tmp_path)
+    job = build_job(_montage_params([]), s)  # montage=[] → pojedynczy produkt
+    assert job.montage_items == []
+    assert compute_layout(job).count > 50
+
+
+def test_montage_requires_gap_mode(tmp_path):
+    s = _session_with_two_pdfs(tmp_path)
+    params = _montage_params([
+        {"print_upload": "a.pdf", "print_page": 0, "cut_upload": "a.pdf", "cut_page": 0, "quantity": 1},
+    ], gap_enabled=False)
+    with pytest.raises(ValueError):
+        build_job(params, s)

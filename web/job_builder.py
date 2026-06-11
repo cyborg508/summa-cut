@@ -2,12 +2,21 @@ from __future__ import annotations
 
 from pydantic import BaseModel, Field
 
-from summa_cut.models import ItemSpec, JobSettings, OposSpec, SelectedPage, SheetSpec
+from summa_cut.models import ItemSpec, JobSettings, MontageItem, OposSpec, SelectedPage, SheetSpec
 from web.sessions import Session
 
 
+class MontageItemParams(BaseModel):
+    label: str = ""
+    print_upload: str
+    print_page: int = 0
+    cut_upload: str
+    cut_page: int = 0
+    quantity: int = 1
+
+
 class JobParams(BaseModel):
-    """Parametry zlecenia (pojedynczy produkt). Montaż/tryb specjalny — później."""
+    """Parametry zlecenia. `montage` niepuste → montaż wielu użytków; puste → pojedynczy produkt."""
     print_upload: str
     print_page: int = 0
     cut_upload: str | None = None
@@ -32,6 +41,8 @@ class JobParams(BaseModel):
     opos_bottom_offset_mm: float = Field(default=10.0)
     opos_top_offset_mm: float = Field(default=40.0)
 
+    montage: list[MontageItemParams] = Field(default_factory=list)
+
 
 def _require_page(session: Session, upload: str, page_index: int, what: str):
     info = session.uploads.get(upload)
@@ -42,6 +53,28 @@ def _require_page(session: Session, upload: str, page_index: int, what: str):
     return info
 
 
+def _build_montage_items(params: JobParams, session: Session) -> list[MontageItem]:
+    items: list[MontageItem] = []
+    for idx, m in enumerate(params.montage):
+        if m.quantity < 1:
+            raise ValueError(f"Ilość użytku #{idx + 1} musi być >= 1.")
+        p_info = _require_page(session, m.print_upload, m.print_page, f"druk montażu #{idx + 1}")
+        c_info = _require_page(session, m.cut_upload, m.cut_page, f"wykrojnik montażu #{idx + 1}")
+        items.append(MontageItem(
+            label=m.label or f"#{idx + 1}",
+            print_page=SelectedPage(p_info.path, m.print_page),
+            cut_page=SelectedPage(c_info.path, m.cut_page),
+            print_page_size_mm=p_info.page_sizes_mm[m.print_page],
+            cut_page_size_mm=c_info.page_sizes_mm[m.cut_page],
+            print_content_size_mm=p_info.page_content_sizes_mm[m.print_page],
+            cut_content_size_mm=c_info.page_content_sizes_mm[m.cut_page],
+            print_content_bbox_pt=p_info.page_content_boxes_pt[m.print_page],
+            cut_content_bbox_pt=c_info.page_content_boxes_pt[m.cut_page],
+            quantity=m.quantity,
+        ))
+    return items
+
+
 def build_job(params: JobParams, session: Session) -> JobSettings:
     if params.item_w_mm <= 0 or params.item_h_mm <= 0:
         raise ValueError("Rozmiar użytku musi być większy od zera.")
@@ -49,15 +82,41 @@ def build_job(params: JobParams, session: Session) -> JobSettings:
         raise ValueError("Rozmiar arkusza musi być większy od zera.")
 
     with_gap = params.gap_enabled
-    print_info = _require_page(session, params.print_upload, params.print_page, "druk")
+    montage_items = _build_montage_items(params, session) if params.montage else []
 
-    if with_gap:
-        if not params.cut_upload or params.cut_page is None:
-            raise ValueError("W trybie z odstępami wybierz też plik i stronę wykrojnika.")
-        cut_upload, cut_page_index = params.cut_upload, params.cut_page
+    if montage_items and not with_gap:
+        # Każdy użytek montażu ma własny wykrojnik; tryb bez odstępów rysowałby
+        # generowaną kratę i ignorował te wykrojniki. Desktop wymusza tu tryb z
+        # odstępami — API odrzuca jawnie, zamiast po cichu pomijać dane.
+        raise ValueError("Montaż wymaga trybu z odstępami (każdy użytek ma własny wykrojnik).")
+
+    if montage_items:
+        base = montage_items[0]
+        print_page = base.print_page
+        cut_page = base.cut_page
+        print_page_size_mm = base.print_page_size_mm
+        cut_page_size_mm = base.cut_page_size_mm
+        print_content_size_mm = base.print_content_size_mm
+        cut_content_size_mm = base.cut_content_size_mm
+        print_content_bbox_pt = base.print_content_bbox_pt
+        cut_content_bbox_pt = base.cut_content_bbox_pt
     else:
-        cut_upload, cut_page_index = params.print_upload, params.print_page
-    cut_info = _require_page(session, cut_upload, cut_page_index, "wykrojnik")
+        print_info = _require_page(session, params.print_upload, params.print_page, "druk")
+        if with_gap:
+            if not params.cut_upload or params.cut_page is None:
+                raise ValueError("W trybie z odstępami wybierz też plik i stronę wykrojnika.")
+            cut_upload, cut_page_index = params.cut_upload, params.cut_page
+        else:
+            cut_upload, cut_page_index = params.print_upload, params.print_page
+        cut_info = _require_page(session, cut_upload, cut_page_index, "wykrojnik")
+        print_page = SelectedPage(print_info.path, params.print_page)
+        cut_page = SelectedPage(cut_info.path, cut_page_index)
+        print_page_size_mm = print_info.page_sizes_mm[params.print_page]
+        cut_page_size_mm = cut_info.page_sizes_mm[cut_page_index]
+        print_content_size_mm = print_info.page_content_sizes_mm[params.print_page]
+        cut_content_size_mm = cut_info.page_content_sizes_mm[cut_page_index]
+        print_content_bbox_pt = print_info.page_content_boxes_pt[params.print_page]
+        cut_content_bbox_pt = cut_info.page_content_boxes_pt[cut_page_index]
 
     if params.manual_grid_enabled:
         if params.manual_columns <= 0 or params.manual_rows <= 0:
@@ -66,14 +125,14 @@ def build_job(params: JobParams, session: Session) -> JobSettings:
             raise ValueError("Przy podziale na 2 grupy manualna liczba rzędów musi być parzysta.")
 
     return JobSettings(
-        print_page=SelectedPage(print_info.path, params.print_page),
-        cut_page=SelectedPage(cut_info.path, cut_page_index),
-        print_page_size_mm=print_info.page_sizes_mm[params.print_page],
-        cut_page_size_mm=cut_info.page_sizes_mm[cut_page_index],
-        print_content_size_mm=print_info.page_content_sizes_mm[params.print_page],
-        cut_content_size_mm=cut_info.page_content_sizes_mm[cut_page_index],
-        print_content_bbox_pt=print_info.page_content_boxes_pt[params.print_page],
-        cut_content_bbox_pt=cut_info.page_content_boxes_pt[cut_page_index],
+        print_page=print_page,
+        cut_page=cut_page,
+        print_page_size_mm=print_page_size_mm,
+        cut_page_size_mm=cut_page_size_mm,
+        print_content_size_mm=print_content_size_mm,
+        cut_content_size_mm=cut_content_size_mm,
+        print_content_bbox_pt=print_content_bbox_pt,
+        cut_content_bbox_pt=cut_content_bbox_pt,
         sheet_spec=SheetSpec(params.sheet_w_mm, params.sheet_h_mm),
         item_spec=ItemSpec(params.item_w_mm, params.item_h_mm, params.rotation_allowed),
         gap_enabled=with_gap,
@@ -84,5 +143,6 @@ def build_job(params: JobParams, session: Session) -> JobSettings:
         manual_grid_enabled=params.manual_grid_enabled,
         manual_columns=params.manual_columns,
         manual_rows=params.manual_rows,
+        montage_items=montage_items,
         opos_spec=OposSpec(params.opos_side_offset_mm, params.opos_bottom_offset_mm, params.opos_top_offset_mm),
     )
