@@ -9,7 +9,7 @@ const special = { printUpload: null, cutUpload: null, pageW: 0, pageH: 0, ready:
 // --- Edytor 3×3 trybu specjalnego -------------------------------------------
 let selectedTile = [1, 1];     // [row, col] aktywnego kafla (domyślnie środek)
 let tileImgUrl = null;          // URL obrazka pojedynczego kafla (po prepare)
-let editorDrag = null;          // {row, col, startX, startY, off, scale} podczas drag
+let editorDrag = null;          // {row, col, startX, startY, off, pxPerMmX, pxPerMmY} podczas drag
 
 // rząd/kol 0 i 2 mapują się na bazę 0 (zewnętrzne), 1 na bazę 1 (środkowa) — jak desktop
 function baseRow(row) { return (row === 0 || row === 2) ? 0 : 1; }
@@ -99,15 +99,21 @@ function editorPointerDown(e) {
   if (!target) return;
   const row = parseInt(target.dataset.row, 10), col = parseInt(target.dataset.col, 10);
   selectedTile = [row, col];
-  const scale = parseFloat($("special-editor").dataset.scale) || 1;
-  editorDrag = { row, col, startX: e.clientX, startY: e.clientY, off: readOffsets(), scale };
-  try { $("special-editor").setPointerCapture(e.pointerId); } catch (_) {}
+  const svg = $("special-editor");
+  const scale = parseFloat(svg.dataset.scale) || 1;   // viewBox-units per mm
+  const rect = svg.getBoundingClientRect();
+  const vb = svg.viewBox.baseVal;                       // {width:300, height:260}
+  // CSS px per mm, osobno dla X i Y (viewBox NIE jest pokazany z zachowaniem proporcji)
+  const pxPerMmX = (scale * rect.width / (vb.width || 1)) || scale;
+  const pxPerMmY = (scale * rect.height / (vb.height || 1)) || scale;
+  editorDrag = { row, col, startX: e.clientX, startY: e.clientY, off: readOffsets(), pxPerMmX, pxPerMmY };
+  try { svg.setPointerCapture(e.pointerId); } catch (_) {}
   renderSpecialEditor();
 }
 function editorPointerMove(e) {
   if (!editorDrag) return;
-  const dxMm = (e.clientX - editorDrag.startX) / editorDrag.scale;
-  const dyMm = (e.clientY - editorDrag.startY) / editorDrag.scale;
+  const dxMm = (e.clientX - editorDrag.startX) / editorDrag.pxPerMmX;
+  const dyMm = (e.clientY - editorDrag.startY) / editorDrag.pxPerMmY;
   const off = JSON.parse(JSON.stringify(editorDrag.off));  // od świeżego snapshotu, bez kumulacji
   applyDrag(off, e.shiftKey, editorDrag.row, editorDrag.col, dxMm, dyMm);
   writeOffsets(off);
