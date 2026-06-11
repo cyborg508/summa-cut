@@ -74,3 +74,16 @@ def test_app_js_references_special_endpoints():
     js = (Path(__file__).resolve().parents[1] / "web" / "static" / "app.js").read_text(encoding="utf-8")
     assert "/api/special/prepare" in js
     assert "special_enabled" in js
+
+
+def test_app_js_invalidates_special_on_input_change():
+    # Po przygotowaniu wykrojnika zmiana pliku/strony/spadu musi unieważnić
+    # gotowość trybu specjalnego, inaczej collectParams() wysłałby stare
+    # przycięcie. Pilnujemy, że funkcja istnieje i jest podpięta pod te wejścia.
+    from pathlib import Path
+    js = (Path(__file__).resolve().parents[1] / "web" / "static" / "app.js").read_text(encoding="utf-8")
+    assert "function invalidateSpecial(" in js
+    for el_id in ["print-file", "print-page", "cut-file", "cut-page", "special-bleed"]:
+        assert f'$("{el_id}").addEventListener' in js
+    # wszystkie te wejścia wołają invalidateSpecial
+    assert js.count("invalidateSpecial") >= 6

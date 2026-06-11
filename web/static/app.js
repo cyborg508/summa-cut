@@ -34,6 +34,15 @@ function wireEvents() {
   // zmiana pliku → odśwież listę stron
   $("print-file").addEventListener("change", () => fillPages("print-file", "print-page"));
   $("cut-file").addEventListener("change", () => fillPages("cut-file", "cut-page"));
+  // Zmiana źródła/strony druku lub wykrojnika albo spadu unieważnia przygotowany
+  // wykrojnik trybu specjalnego (przycięcie przestaje pasować). Robimy to PRZED
+  // (debounce'owanym) podglądem przez #controls, więc kolejny podgląd widzi już
+  // stan „niegotowy" i wraca do zwykłego zadania zamiast starego przycięcia.
+  $("print-file").addEventListener("change", invalidateSpecial);
+  $("print-page").addEventListener("change", invalidateSpecial);
+  $("cut-file").addEventListener("change", invalidateSpecial);
+  $("cut-page").addEventListener("change", invalidateSpecial);
+  $("special-bleed").addEventListener("input", invalidateSpecial);
 }
 
 async function doUpload() {
@@ -92,29 +101,52 @@ function fillPages(fileId, pageId) {
   sel.innerHTML = pageOptionsHtml(name, cur);
 }
 
-function onMontageToggle() {
-  const on = $("montage-enable").checked;
-  if (on) {
-    $("gap-on").checked = true;     // montaż wymaga trybu z odstępami
+// Wspólna blokada trybu odstępów: montaż ORAZ tryb specjalny wymagają układu
+// „z odstępami". Liczymy stan z OBU przełączników, żeby się nie nadpisywały
+// (gdy jeden się wyłącza, a drugi wciąż chce blokady).
+function updateGapLock() {
+  const lock = $("montage-enable").checked || $("special-enable").checked;
+  if (lock) {
+    $("gap-on").checked = true;
     $("gap-off").disabled = true;
-    if (montage.length === 0) addMontageRow();
   } else {
     $("gap-off").disabled = false;
   }
+}
+
+function onMontageToggle() {
+  const on = $("montage-enable").checked;
+  if (on && montage.length === 0) addMontageRow();
+  updateGapLock();
   schedulePreview();
 }
 
 function onSpecialToggle() {
   const on = $("special-enable").checked;
   $("special-body").hidden = !on;
-  if (on) {
-    // tryb specjalny wymusza układ z odstępami (backend wymusza gap_enabled=True)
-    $("gap-on").checked = true;
-    $("gap-off").disabled = true;
-  } else {
-    $("gap-off").disabled = false;
-  }
+  updateGapLock();
   schedulePreview();
+}
+
+// Unieważnia gotowość trybu specjalnego: po przygotowaniu wykrojnika special.*
+// trzyma PRZYCIĘTE uploady i rozmiar kafla dla KONKRETNEGO źródła/spadu. Gdy
+// użytkownik zmieni plik/stronę druku lub wykrojnika albo spad, te dane są
+// nieaktualne — kasujemy je, żeby collectParams() nie wysłał starego przycięcia
+// (inaczej podgląd/generowanie pokazałyby grafikę, która już nie pasuje).
+function invalidateSpecial() {
+  special.ready = false;
+  special.printUpload = null;
+  special.cutUpload = null;
+  special.pageW = 0;
+  special.pageH = 0;
+  const status = $("special-status");
+  if ($("special-enable").checked) {
+    status.classList.remove("err");
+    status.textContent = "Zmieniono źródło/spad — kliknij „Przygotuj wykrojnik” ponownie.";
+  } else {
+    status.classList.remove("err");
+    status.textContent = "";
+  }
 }
 
 async function doSpecialPrepare() {
