@@ -3,7 +3,6 @@ const $ = (id) => document.getElementById(id);
 const uploads = {};          // name -> page_count
 let montage = [];            // [{label,print_upload,print_page,cut_upload,cut_page,quantity}]
 let previewTimer = null;
-let generated = false;
 
 async function init() {
   await fetch("/api/session", { method: "POST" });
@@ -164,8 +163,7 @@ function schedulePreview() {
   previewTimer = setTimeout(updatePreview, 300);
 }
 
-async function updatePreview() {
-  if (!$("print-file").value && !$("montage-enable").checked) return;
+async function applyJob() {
   const r = await fetch("/api/job", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -178,30 +176,81 @@ async function updatePreview() {
       `Użytków: ${s.count} (pojemność ${s.capacity_count}` +
       (s.requested_count ? `, zamówiono ${s.requested_count}` : "") +
       `) · ${s.rows}×${s.columns}` + (s.used_rotation ? " · obrót 90°" : "");
+    return true;
+  }
+  showError((await r.json()).detail || "Błąd układu.");
+  return false;
+}
+
+async function updatePreview() {
+  if (!$("print-file").value && !$("montage-enable").checked) return;
+  if (await applyJob()) {
     const t = Date.now();
     $("preview-print").src = `/api/preview/print.png?t=${t}`;
     $("preview-cut").src = `/api/preview/cut.png?t=${t}`;
-  } else {
-    showError((await r.json()).detail || "Błąd układu.");
   }
 }
 
+// Nazwa bazowa proponowana z pliku DRUKU (montaż: pierwszy użytek), bez .pdf.
+function computeBase() {
+  let name = "";
+  if ($("montage-enable").checked && montage.length && montage[0].print_upload) {
+    name = montage[0].print_upload;
+  } else {
+    name = $("print-file").value;
+  }
+  name = (name || "wynik").replace(/\.pdf$/i, "").trim();
+  return name || "wynik";
+}
+
 async function doGenerate() {
+  // Najpierw upewnij się, że bieżący układ jest poprawny i zapisany w sesji.
+  if (!(await applyJob())) return;
+  const base = computeBase();
   const r = await fetch("/api/generate", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ base_name: $("base-name").value || "wynik" }),
+    body: JSON.stringify({ base_name: base }),
   });
-  if (r.ok) {
-    clearError();
-    generated = true;
-    const t = Date.now();
-    const dp = $("download-print"), dc = $("download-cut");
-    dp.href = `/api/download/print?t=${t}`; dp.hidden = false;
-    dc.href = `/api/download/cut?t=${t}`; dc.hidden = false;
-    $("summary").textContent = "Wygenerowano. Pobierz pliki po prawej.";
-  } else {
+  if (!r.ok) {
     showError((await r.json()).detail || "Błąd generowania (najpierw ustaw poprawny układ).");
+    return;
+  }
+  clearError();
+  try {
+    await saveOne("print", `${base}_druk.pdf`);
+    await saveOne("cut", `${base}_wykrojnik.pdf`);
+    $("summary").textContent = `Zapisano: ${base}_druk.pdf + ${base}_wykrojnik.pdf`;
+  } catch (e) {
+    if (e && e.name === "AbortError") { $("summary").textContent = "Zapis anulowany."; return; }
+    showError("Błąd zapisu plików: " + ((e && e.message) || e));
+  }
+}
+
+// Pobiera wygenerowany plik i zapisuje go. Gdy dostępne (HTTPS/localhost) —
+// prawdziwe okno „Zapisz jako" z proponowaną nazwą i wyborem lokalizacji;
+// w przeciwnym razie zwykłe pobranie z poprawną nazwą.
+async function saveOne(which, filename) {
+  const resp = await fetch(`/api/download/${which}?t=${Date.now()}`);
+  if (!resp.ok) throw new Error(`pobranie „${which}" nieudane`);
+  const blob = await resp.blob();
+  if (window.showSaveFilePicker) {
+    const handle = await window.showSaveFilePicker({
+      suggestedName: filename,
+      types: [{ description: "PDF", accept: { "application/pdf": [".pdf"] } }],
+    });
+    const w = await handle.createWritable();
+    await w.write(blob);
+    await w.close();
+  } else {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
   }
 }
 

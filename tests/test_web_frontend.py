@@ -31,9 +31,18 @@ REQUIRED_IDS = [
     "gap-mm", "split", "split-spread", "manual", "manual-cols", "manual-rows",
     "opos-side", "opos-bottom", "opos-top",
     "montage-enable", "montage-rows", "montage-add",
-    "base-name", "generate-btn", "summary", "error",
-    "preview-print", "preview-cut", "download-print", "download-cut",
+    "generate-btn", "summary", "error",
+    "preview-print", "preview-cut",
 ]
+
+
+REMOVED_IDS = ["base-name", "download-print", "download-cut"]
+
+
+def test_index_no_longer_has_removed_ids(tmp_path):
+    html = _client(tmp_path).get("/").text
+    present = [i for i in REMOVED_IDS if f'id="{i}"' in html]
+    assert not present, f"usunięte elementy wciąż w index.html: {present}"
 
 
 def test_index_has_required_element_ids(tmp_path):

@@ -62,8 +62,8 @@
 
       <fieldset>
         <legend>Zapis</legend>
-        <label>nazwa <input type="text" id="base-name" value="wynik"></label>
-        <button type="button" id="generate-btn">Generuj PDF-y</button>
+        <button type="button" id="generate-btn">Generuj i zapisz PDF-y</button>
+        <p class="muted hint">Nazwa proponowana z pliku druku; zapis dwóch plików z dopiskiem <em>_druk</em> / <em>_wykrojnik</em>.</p>
       </fieldset>
     </section>
 
@@ -77,10 +77,6 @@
       <div class="preview-block">
         <h2>Wykrojnik</h2>
         <img id="preview-cut" alt="podgląd wykrojnika">
-      </div>
-      <div class="downloads">
-        <a id="download-print" href="/api/download/print" download hidden>Pobierz druk.pdf</a>
-        <a id="download-cut" href="/api/download/cut" download hidden>Pobierz wykrojnik.pdf</a>
       </div>
     </section>
   </main>
