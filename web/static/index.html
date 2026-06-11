@@ -1,3 +1,89 @@
 <!doctype html>
-<html lang="pl"><head><meta charset="utf-8"><title>summa-cut web</title></head>
-<body><div id="app">summa-cut</div></body></html>
+<html lang="pl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>summa-cut web</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <header><h1>summa-cut <span class="muted">— impozytor druk + wykrojnik</span></h1></header>
+  <main>
+    <section class="controls" id="controls">
+      <fieldset>
+        <legend>Pliki PDF</legend>
+        <input type="file" id="upload-input" accept="application/pdf" multiple>
+        <button type="button" id="upload-btn">Wgraj</button>
+        <ul id="uploads-list" class="uploads"></ul>
+      </fieldset>
+
+      <fieldset>
+        <legend>Źródło (gdy bez montażu)</legend>
+        <label>Druk plik <select id="print-file"></select></label>
+        <label>strona <select id="print-page"></select></label>
+        <label>Wykrojnik plik <select id="cut-file"></select></label>
+        <label>strona <select id="cut-page"></select></label>
+      </fieldset>
+
+      <fieldset>
+        <legend>Arkusz i użytek (mm)</legend>
+        <label>Arkusz szer. <input type="number" id="sheet-w" value="330" step="1" min="1"></label>
+        <label>wys. <input type="number" id="sheet-h" value="480" step="1" min="1"></label>
+        <label>Użytek szer. <input type="number" id="item-w" value="30" step="0.1" min="0.1"></label>
+        <label>wys. <input type="number" id="item-h" value="30" step="0.1" min="0.1"></label>
+        <label><input type="checkbox" id="rotation"> pozwól obrót 90°</label>
+      </fieldset>
+
+      <fieldset>
+        <legend>Tryb</legend>
+        <label><input type="radio" name="gapmode" id="gap-on" value="gap" checked> z odstępami</label>
+        <label><input type="radio" name="gapmode" id="gap-off" value="nogap"> bez odstępów (krata cięcia)</label>
+        <label>odstęp mm <input type="number" id="gap-mm" value="3" step="0.1" min="0"></label>
+        <label><input type="checkbox" id="split"> podział na 2 grupy (góra/dół)</label>
+        <label><input type="checkbox" id="split-spread"> dociśnij do skraju</label>
+        <label><input type="checkbox" id="manual"> siatka manualna</label>
+        <label>kol. <input type="number" id="manual-cols" value="0" step="1" min="0"></label>
+        <label>rzędy <input type="number" id="manual-rows" value="0" step="1" min="0"></label>
+      </fieldset>
+
+      <fieldset>
+        <legend>OPOS (mm)</legend>
+        <label>bok <input type="number" id="opos-side" value="10" step="1" min="0"></label>
+        <label>dół <input type="number" id="opos-bottom" value="10" step="1" min="0"></label>
+        <label>góra <input type="number" id="opos-top" value="40" step="1" min="0"></label>
+      </fieldset>
+
+      <fieldset>
+        <legend>Montaż wielu użytków</legend>
+        <label><input type="checkbox" id="montage-enable"> włącz montaż (wymaga trybu z odstępami)</label>
+        <div id="montage-rows"></div>
+        <button type="button" id="montage-add">+ dodaj użytek</button>
+      </fieldset>
+
+      <fieldset>
+        <legend>Zapis</legend>
+        <label>nazwa <input type="text" id="base-name" value="wynik"></label>
+        <button type="button" id="generate-btn">Generuj PDF-y</button>
+      </fieldset>
+    </section>
+
+    <section class="preview">
+      <div id="error" class="error" hidden></div>
+      <div id="summary" class="summary">Wgraj PDF i ustaw parametry.</div>
+      <div class="preview-block">
+        <h2>Druk</h2>
+        <img id="preview-print" alt="podgląd druku">
+      </div>
+      <div class="preview-block">
+        <h2>Wykrojnik</h2>
+        <img id="preview-cut" alt="podgląd wykrojnika">
+      </div>
+      <div class="downloads">
+        <a id="download-print" href="/api/download/print" download hidden>Pobierz druk.pdf</a>
+        <a id="download-cut" href="/api/download/cut" download hidden>Pobierz wykrojnik.pdf</a>
+      </div>
+    </section>
+  </main>
+  <script src="/static/app.js"></script>
+</body>
+</html>
