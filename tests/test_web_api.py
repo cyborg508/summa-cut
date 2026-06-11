@@ -261,6 +261,28 @@ def test_special_prepare_out_of_range_page_is_400(tmp_path):
     })
     assert over.status_code == 400, over.text
 
+
+def test_special_tile_png_after_prepare(tmp_path):
+    c = _client(tmp_path)
+    c.post("/api/session")
+    data = _make_special_source_bytes()
+    c.post("/api/upload", files={"file": ("zrodlo.pdf", data, "application/pdf")})
+    c.post("/api/special/prepare", json={
+        "print_upload": "zrodlo.pdf", "print_page": 0,
+        "cut_upload": "zrodlo.pdf", "cut_page": 0, "bleed_mm": 3.0,
+    })
+    r = c.get("/api/special/tile.png")
+    assert r.status_code == 200, r.text
+    assert r.headers["content-type"] == "image/png"
+    assert len(r.content) > 100
+
+
+def test_special_tile_png_without_prepare_is_400(tmp_path):
+    c = _client(tmp_path)
+    c.post("/api/session")
+    r = c.get("/api/special/tile.png")
+    assert r.status_code == 400
+
     negative = c.post("/api/special/prepare", json={
         "print_upload": "zrodlo.pdf", "print_page": -1,
         "cut_upload": "zrodlo.pdf", "cut_page": 0,

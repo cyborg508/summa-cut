@@ -41,3 +41,21 @@ def test_invalid_which_raises(tmp_path):
     job, layout = _job(tmp_path)
     with pytest.raises(ValueError):
         render_output_png(job, layout, which="bok", max_px=400)
+
+
+def test_render_special_tile_png_nonzero(tmp_path):
+    import fitz
+    from web.preview_render import render_special_tile_png
+    # „przycięty druk": szare wypełnienie; „przycięty wykrojnik": czerwony obrys
+    pp = tmp_path / "p.pdf"
+    doc = fitz.open(); pg = doc.new_page(width=80, height=60)
+    pg.draw_rect(fitz.Rect(0, 0, 80, 60), color=(0, 0, 0), fill=(0.6, 0.6, 0.6), width=0)
+    doc.save(str(pp)); doc.close()
+    cp = tmp_path / "c.pdf"
+    doc = fitz.open(); pg = doc.new_page(width=80, height=60)
+    pg.draw_rect(fitz.Rect(2, 2, 78, 58), color=(1, 0, 0), width=1.0)
+    doc.save(str(cp)); doc.close()
+
+    png = render_special_tile_png(str(pp), str(cp), max_px=200)
+    assert isinstance(png, bytes) and len(png) > 100
+    assert png[:8] == b"\x89PNG\r\n\x1a\n"

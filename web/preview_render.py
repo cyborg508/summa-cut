@@ -25,3 +25,21 @@ def render_output_png(job: JobSettings, layout: LayoutResult, which: str = "prin
     finally:
         docs.print_doc.close()
         docs.cut_doc.close()
+
+
+def render_special_tile_png(print_pdf_path: str, cut_pdf_path: str, max_px: int = PREVIEW_MAX_PX) -> bytes:
+    """Renderuje pojedynczy przygotowany kafel: pełna grafika druku + obrys wykrojnika na wierzchu.
+
+    Używane przez edytor 3×3 trybu specjalnego — front powiela ten obrazek 9×."""
+    with fitz.open(print_pdf_path) as pdoc, fitz.open(cut_pdf_path) as cdoc:
+        rect = pdoc[0].rect
+        out = fitz.open()
+        try:
+            page = out.new_page(width=rect.width, height=rect.height)
+            page.show_pdf_page(page.rect, pdoc, 0)   # druk pod spodem
+            page.show_pdf_page(page.rect, cdoc, 0)   # wykrojnik na wierzchu
+            scale = max_px / max(rect.width, rect.height, 1.0)
+            pix = page.get_pixmap(matrix=fitz.Matrix(scale, scale), alpha=False)
+            return pix.tobytes("png")
+        finally:
+            out.close()

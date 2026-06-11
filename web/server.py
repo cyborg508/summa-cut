@@ -13,9 +13,9 @@ from fastapi.staticfiles import StaticFiles
 
 from summa_cut.export import generate_output_docs, save_output_docs
 from summa_cut.layout import compute_layout
-from summa_cut.special_trim import prepare_special_trim
+from summa_cut.special_trim import prepare_special_trim, SPECIAL_PRINT_NAME, SPECIAL_CUT_NAME
 from web.job_builder import JobParams, _require_page, build_job
-from web.preview_render import render_output_png
+from web.preview_render import render_output_png, render_special_tile_png
 from web.sessions import Session, SessionStore
 
 
@@ -102,6 +102,15 @@ def create_app(store: SessionStore) -> FastAPI:
             "page_width_mm": result.page_width_mm,
             "page_height_mm": result.page_height_mm,
         }
+
+    @app.get("/api/special/tile.png")
+    def special_tile(session: Session = Depends(current_session)) -> RawResponse:
+        p = session.uploads.get(SPECIAL_PRINT_NAME)
+        c = session.uploads.get(SPECIAL_CUT_NAME)
+        if p is None or c is None:
+            raise HTTPException(status_code=400, detail="Najpierw przygotuj wykrojnik (/api/special/prepare).")
+        png = render_special_tile_png(p.path, c.path)
+        return RawResponse(content=png, media_type="image/png")
 
     @app.post("/api/job")
     def set_job(params: JobParams, session: Session = Depends(current_session)) -> dict:
