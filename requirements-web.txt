@@ -1,3 +1,5 @@
 fastapi>=0.110
 uvicorn[standard]>=0.29
 python-multipart>=0.0.9
+PyMuPDF>=1.24
+pikepdf>=9

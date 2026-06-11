@@ -1,0 +1,13 @@
+services:
+  summa-cut-web:
+    build: .
+    image: summa-cut-web:latest
+    container_name: summa-cut-web
+    restart: unless-stopped
+    ports:
+      - "8800:8000"
+    volumes:
+      - summa-cut-data:/tmp/summa-cut-web
+
+volumes:
+  summa-cut-data:
