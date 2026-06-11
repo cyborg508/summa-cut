@@ -245,3 +245,25 @@ def test_special_prepare_rejects_blank_page(tmp_path):
         "bleed_mm": 3.0,
     })
     assert prep.status_code == 400
+
+
+def test_special_prepare_out_of_range_page_is_400(tmp_path):
+    c = _client(tmp_path)
+    c.post("/api/session")
+    data = _make_special_source_bytes()
+    up = c.post("/api/upload", files={"file": ("zrodlo.pdf", data, "application/pdf")})
+    assert up.status_code == 200
+
+    over = c.post("/api/special/prepare", json={
+        "print_upload": "zrodlo.pdf", "print_page": 0,
+        "cut_upload": "zrodlo.pdf", "cut_page": 5,
+        "bleed_mm": 3.0,
+    })
+    assert over.status_code == 400, over.text
+
+    negative = c.post("/api/special/prepare", json={
+        "print_upload": "zrodlo.pdf", "print_page": -1,
+        "cut_upload": "zrodlo.pdf", "cut_page": 0,
+        "bleed_mm": 3.0,
+    })
+    assert negative.status_code == 400, negative.text
