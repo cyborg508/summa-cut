@@ -17,6 +17,8 @@ class Session:
     last_seen: float
     uploads: dict[str, PdfInfo] = field(default_factory=dict)
     job_params: dict | None = None
+    result_print_name: str | None = None
+    result_cut_name: str | None = None
 
 
 class SessionStore:

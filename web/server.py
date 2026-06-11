@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import asyncio
+from contextlib import asynccontextmanager
 from pathlib import Path
 
 from pydantic import BaseModel
@@ -20,7 +22,19 @@ class GenerateParams(BaseModel):
 
 
 def create_app(store: SessionStore) -> FastAPI:
-    app = FastAPI(title="summa-cut web")
+    @asynccontextmanager
+    async def lifespan(_app: FastAPI):
+        async def _sweeper():
+            while True:
+                await asyncio.sleep(3600)
+                store.sweep()
+        task = asyncio.create_task(_sweeper())
+        try:
+            yield
+        finally:
+            task.cancel()
+
+    app = FastAPI(title="summa-cut web", lifespan=lifespan)
     app.state.store = store
 
     def current_session(request: Request) -> Session:
@@ -69,8 +83,7 @@ def create_app(store: SessionStore) -> FastAPI:
     def _job_and_layout(session: Session):
         if session.job_params is None:
             raise HTTPException(status_code=400, detail="Najpierw ustaw zlecenie (/api/job).")
-        clean = {k: v for k, v in session.job_params.items() if not k.startswith("_")}
-        job = build_job(JobParams(**clean), session)
+        job = build_job(JobParams(**session.job_params), session)
         return job, compute_layout(job)
 
     @app.get("/api/preview/{which}.png")
@@ -78,7 +91,7 @@ def create_app(store: SessionStore) -> FastAPI:
         if which not in ("print", "cut"):
             raise HTTPException(status_code=404, detail="Nieznany podgląd.")
         job, layout = _job_and_layout(session)
-        png = render_output_png(job, layout, which=which, max_px=900)
+        png = render_output_png(job, layout, which=which)
         return RawResponse(content=png, media_type="image/png")
 
     @app.post("/api/generate")
@@ -90,16 +103,15 @@ def create_app(store: SessionStore) -> FastAPI:
         finally:
             docs.print_doc.close()
             docs.cut_doc.close()
-        session.job_params["_print_name"] = print_path.name
-        session.job_params["_cut_name"] = cut_path.name
+        session.result_print_name = print_path.name
+        session.result_cut_name = cut_path.name
         return {"print_name": print_path.name, "cut_name": cut_path.name}
 
     @app.get("/api/download/{which}")
     def download(which: str, session: Session = Depends(current_session)) -> FileResponse:
         if which not in ("print", "cut"):
             raise HTTPException(status_code=404, detail="Nieznany plik.")
-        key = "_print_name" if which == "print" else "_cut_name"
-        name = (session.job_params or {}).get(key)
+        name = session.result_print_name if which == "print" else session.result_cut_name
         if not name:
             raise HTTPException(status_code=404, detail="Najpierw wygeneruj wynik (/api/generate).")
         path = Path(session.workdir) / name

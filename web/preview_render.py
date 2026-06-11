@@ -5,8 +5,10 @@ import fitz
 from summa_cut.export import generate_output_docs
 from summa_cut.models import JobSettings, LayoutResult
 
+PREVIEW_MAX_PX = 900
 
-def render_output_png(job: JobSettings, layout: LayoutResult, which: str = "print", max_px: int = 900) -> bytes:
+
+def render_output_png(job: JobSettings, layout: LayoutResult, which: str = "print", max_px: int = PREVIEW_MAX_PX) -> bytes:
     """Renderuje PRAWDZIWY wynik (druk/wykrojnik) do PNG przez fitz.
 
     Po Fazie 0 generowanie jest szybkie (~0,24 s @560), więc podgląd = realny
