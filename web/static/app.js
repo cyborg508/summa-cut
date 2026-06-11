@@ -3,6 +3,18 @@ const $ = (id) => document.getElementById(id);
 const uploads = {};          // name -> page_count
 let montage = [];            // [{label,print_upload,print_page,cut_upload,cut_page,quantity}]
 let previewTimer = null;
+// stan trybu specjalnego: po „Przygotuj" trzyma przycięte uploady i rozmiar kafla
+const special = { printUpload: null, cutUpload: null, pageW: 0, pageH: 0, ready: false };
+
+function specialOffsets() {
+  const v = (id) => parseFloat($(id).value) || 0;
+  return {
+    special_row_offsets_mm: [v("special-row0"), v("special-row1")],
+    special_col_offsets_mm: [v("special-col0"), v("special-col1")],
+    special_col_x_offsets_mm: [v("special-colx0"), v("special-colx1")],
+    special_row_y_offsets_mm: [v("special-rowy0"), v("special-rowy1")],
+  };
+}
 
 async function init() {
   await fetch("/api/session", { method: "POST" });
@@ -14,6 +26,8 @@ function wireEvents() {
   $("generate-btn").addEventListener("click", doGenerate);
   $("montage-add").addEventListener("click", () => { addMontageRow(); schedulePreview(); });
   $("montage-enable").addEventListener("change", onMontageToggle);
+  $("special-enable").addEventListener("change", onSpecialToggle);
+  $("special-prepare-btn").addEventListener("click", doSpecialPrepare);
   // każda zmiana kontrolki → przeliczenie podglądu (debounce)
   $("controls").addEventListener("input", schedulePreview);
   $("controls").addEventListener("change", schedulePreview);
@@ -90,6 +104,60 @@ function onMontageToggle() {
   schedulePreview();
 }
 
+function onSpecialToggle() {
+  const on = $("special-enable").checked;
+  $("special-body").hidden = !on;
+  if (on) {
+    // tryb specjalny wymusza układ z odstępami (backend wymusza gap_enabled=True)
+    $("gap-on").checked = true;
+    $("gap-off").disabled = true;
+  } else {
+    $("gap-off").disabled = false;
+  }
+  schedulePreview();
+}
+
+async function doSpecialPrepare() {
+  const status = $("special-status");
+  const payload = {
+    print_upload: $("print-file").value,
+    print_page: parseInt($("print-page").value || "0", 10),
+    cut_upload: $("cut-file").value,
+    cut_page: parseInt($("cut-page").value || "0", 10),
+    bleed_mm: parseFloat($("special-bleed").value) || 0,
+  };
+  status.classList.remove("err");
+  status.textContent = "Przygotowuję…";
+  special.ready = false;
+  let res;
+  try {
+    res = await fetch("/api/special/prepare", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+  } catch (e) {
+    status.classList.add("err");
+    status.textContent = "Błąd sieci: " + ((e && e.message) || e);
+    return;
+  }
+  if (!res.ok) {
+    let detail;
+    try { detail = (await res.json()).detail; } catch (e) { detail = await res.text(); }
+    status.classList.add("err");
+    status.textContent = "Błąd: " + (detail || res.status);
+    return;
+  }
+  const b = await res.json();
+  special.printUpload = b.print_upload;
+  special.cutUpload = b.cut_upload;
+  special.pageW = b.page_width_mm;
+  special.pageH = b.page_height_mm;
+  special.ready = true;
+  status.textContent = `Gotowe: kafel ${b.page_width_mm.toFixed(1)}×${b.page_height_mm.toFixed(1)} mm`;
+  schedulePreview();
+}
+
 function addMontageRow() {
   montage.push({ label: "", print_upload: "", print_page: 0, cut_upload: "", cut_page: 0, quantity: 1 });
   renderMontage();
@@ -134,7 +202,7 @@ function optList(names, selected) {
 
 function collectParams() {
   const gap = document.querySelector("input[name=gapmode]:checked").value === "gap";
-  return {
+  const params = {
     print_upload: $("print-file").value,
     print_page: parseInt($("print-page").value || "0", 10),
     cut_upload: $("cut-file").value || null,
@@ -156,6 +224,22 @@ function collectParams() {
     opos_top_offset_mm: parseFloat($("opos-top").value),
     montage: $("montage-enable").checked ? montage : [],
   };
+  // Tryb specjalny: tylko gdy włączony I przygotowany (mamy przycięte uploady
+  // i rozmiar kafla). Gdy zaznaczony, ale jeszcze nie przygotowany — nie wysyłamy
+  // special_enabled, żeby podgląd/układ nie wybuchał (backend wymaga przygotowania).
+  if ($("special-enable").checked && special.ready) {
+    Object.assign(params, {
+      print_upload: special.printUpload,
+      cut_upload: special.cutUpload,
+      print_page: 0,
+      cut_page: 0,
+      item_w_mm: special.pageW,
+      item_h_mm: special.pageH,
+      special_enabled: true,
+      ...specialOffsets(),
+    });
+  }
+  return params;
 }
 
 function schedulePreview() {
@@ -183,7 +267,8 @@ async function applyJob() {
 }
 
 async function updatePreview() {
-  if (!$("print-file").value && !$("montage-enable").checked) return;
+  const specialReady = $("special-enable").checked && special.ready;
+  if (!$("print-file").value && !$("montage-enable").checked && !specialReady) return;
   if (await applyJob()) {
     const t = Date.now();
     $("preview-print").src = `/api/preview/print.png?t=${t}`;

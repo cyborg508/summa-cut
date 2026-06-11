@@ -60,6 +60,27 @@
         <button type="button" id="montage-add">+ dodaj użytek</button>
       </fieldset>
 
+      <fieldset class="special">
+        <legend>Tryb specjalny (wektorowy obrys + spad)</legend>
+        <label><input type="checkbox" id="special-enable"> włącz tryb specjalny</label>
+        <div id="special-body" hidden>
+          <label>spad mm <input type="number" id="special-bleed" value="3" step="0.1" min="0"></label>
+          <button type="button" id="special-prepare-btn">Przygotuj wykrojnik</button>
+          <span id="special-status" class="special-status"></span>
+          <fieldset class="special-offsets">
+            <legend>Offsety kafli 2×2 (mm)</legend>
+            <label>rząd 0 X <input type="number" id="special-row0" value="0" step="0.1"></label>
+            <label>rząd 1 X <input type="number" id="special-row1" value="0" step="0.1"></label>
+            <label>kol. 0 Y <input type="number" id="special-col0" value="0" step="0.1"></label>
+            <label>kol. 1 Y <input type="number" id="special-col1" value="0" step="0.1"></label>
+            <label>kol. 0 X <input type="number" id="special-colx0" value="0" step="0.1"></label>
+            <label>kol. 1 X <input type="number" id="special-colx1" value="0" step="0.1"></label>
+            <label>rząd 0 Y <input type="number" id="special-rowy0" value="0" step="0.1"></label>
+            <label>rząd 1 Y <input type="number" id="special-rowy1" value="0" step="0.1"></label>
+          </fieldset>
+        </div>
+      </fieldset>
+
       <fieldset>
         <legend>Zapis</legend>
         <button type="button" id="generate-btn">Generuj i zapisz PDF-y</button>
