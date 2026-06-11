@@ -163,3 +163,12 @@ def test_montage_empty_list_uses_single_product_path(tmp_path):
     job = build_job(_montage_params([]), s)  # montage=[] → pojedynczy produkt
     assert job.montage_items == []
     assert compute_layout(job).count > 50
+
+
+def test_montage_requires_gap_mode(tmp_path):
+    s = _session_with_two_pdfs(tmp_path)
+    params = _montage_params([
+        {"print_upload": "a.pdf", "print_page": 0, "cut_upload": "a.pdf", "cut_page": 0, "quantity": 1},
+    ], gap_enabled=False)
+    with pytest.raises(ValueError):
+        build_job(params, s)

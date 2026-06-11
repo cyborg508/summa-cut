@@ -84,6 +84,12 @@ def build_job(params: JobParams, session: Session) -> JobSettings:
     with_gap = params.gap_enabled
     montage_items = _build_montage_items(params, session) if params.montage else []
 
+    if montage_items and not with_gap:
+        # Każdy użytek montażu ma własny wykrojnik; tryb bez odstępów rysowałby
+        # generowaną kratę i ignorował te wykrojniki. Desktop wymusza tu tryb z
+        # odstępami — API odrzuca jawnie, zamiast po cichu pomijać dane.
+        raise ValueError("Montaż wymaga trybu z odstępami (każdy użytek ma własny wykrojnik).")
+
     if montage_items:
         base = montage_items[0]
         print_page = base.print_page
