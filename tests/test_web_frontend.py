@@ -142,3 +142,11 @@ def test_app_js_view_switch():
     from pathlib import Path
     js = (Path(__file__).resolve().parents[1] / "web" / "static" / "app.js").read_text(encoding="utf-8")
     assert "rightView" in js and "setRightView" in js
+
+
+def test_app_js_auto_assign_sources():
+    from pathlib import Path
+    js = (Path(__file__).resolve().parents[1] / "web" / "static" / "app.js").read_text(encoding="utf-8")
+    assert "autoAssignSources" in js and "assignSource" in js
+    # auto-przypisanie wołane po wgraniu
+    assert "autoAssignSources(newNames)" in js
