@@ -3,6 +3,7 @@ const $ = (id) => document.getElementById(id);
 const uploads = {};          // name -> page_count
 let montage = [];            // [{label,print_upload,print_page,cut_upload,cut_page,quantity}]
 let previewTimer = null;
+let previewWhich = "print";  // który obraz pokazuje podgląd: "print" | "cut"
 // stan trybu specjalnego: po „Przygotuj" trzyma przycięte uploady i rozmiar kafla
 const special = { printUpload: null, cutUpload: null, pageW: 0, pageH: 0, ready: false };
 
@@ -159,6 +160,8 @@ async function init() {
 function wireEvents() {
   $("upload-btn").addEventListener("click", doUpload);
   $("generate-btn").addEventListener("click", doGenerate);
+  $("preview-print-btn").addEventListener("click", () => setPreviewWhich("print"));
+  $("preview-cut-btn").addEventListener("click", () => setPreviewWhich("cut"));
   $("montage-add").addEventListener("click", () => { addMontageRow(); schedulePreview(); });
   $("montage-enable").addEventListener("change", onMontageToggle);
   $("special-enable").addEventListener("change", onSpecialToggle);
@@ -444,13 +447,18 @@ async function applyJob() {
   return false;
 }
 
+function setPreviewWhich(which) {
+  previewWhich = which;
+  $("preview-print-btn").classList.toggle("active", which === "print");
+  $("preview-cut-btn").classList.toggle("active", which === "cut");
+  $("preview-img").src = `/api/preview/${which}.png?t=${Date.now()}`;
+}
+
 async function updatePreview() {
   const specialReady = $("special-enable").checked && special.ready;
   if (!$("print-file").value && !$("montage-enable").checked && !specialReady) return;
   if (await applyJob()) {
-    const t = Date.now();
-    $("preview-print").src = `/api/preview/print.png?t=${t}`;
-    $("preview-cut").src = `/api/preview/cut.png?t=${t}`;
+    $("preview-img").src = `/api/preview/${previewWhich}.png?t=${Date.now()}`;
   }
 }
 

@@ -32,7 +32,7 @@ REQUIRED_IDS = [
     "opos-side", "opos-bottom", "opos-top",
     "montage-enable", "montage-rows", "montage-add",
     "generate-btn", "summary", "error",
-    "preview-print", "preview-cut",
+    "preview-img", "preview-print-btn", "preview-cut-btn",
 ]
 
 
@@ -93,6 +93,22 @@ def test_app_js_has_editor_logic():
     assert "/api/special/tile.png" in js
     assert "tileOrigin" in js and "applyDrag" in js
     assert "renderSpecialEditor" in js
+
+
+def test_preview_is_single_image_with_toggle():
+    from pathlib import Path
+    html = (Path(__file__).resolve().parents[1] / "web" / "static" / "index.html").read_text(encoding="utf-8")
+    assert 'id="preview-img"' in html
+    assert 'id="preview-print-btn"' in html and 'id="preview-cut-btn"' in html
+    assert 'id="preview-print"' not in html
+    assert 'id="preview-cut"' not in html
+
+
+def test_app_js_preview_toggle():
+    from pathlib import Path
+    js = (Path(__file__).resolve().parents[1] / "web" / "static" / "app.js").read_text(encoding="utf-8")
+    assert "previewWhich" in js
+    assert "preview-img" in js
 
 
 def test_app_js_invalidates_special_on_input_change():

@@ -92,16 +92,17 @@
       </fieldset>
     </section>
 
-    <section class="preview">
+    <section class="preview" id="panel">
       <div id="error" class="error" hidden></div>
       <div id="summary" class="summary">Wgraj PDF i ustaw parametry.</div>
-      <div class="preview-block">
-        <h2>Druk</h2>
-        <img id="preview-print" alt="podgląd druku">
-      </div>
-      <div class="preview-block">
-        <h2>Wykrojnik</h2>
-        <img id="preview-cut" alt="podgląd wykrojnika">
+      <div id="view-preview">
+        <div class="segmented" id="preview-toggle">
+          <button type="button" id="preview-print-btn" class="seg-btn active">Druk</button>
+          <button type="button" id="preview-cut-btn" class="seg-btn">Wykrojnik</button>
+        </div>
+        <div class="preview-block">
+          <img id="preview-img" alt="podgląd">
+        </div>
       </div>
     </section>
   </main>
