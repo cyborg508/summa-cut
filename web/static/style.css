@@ -30,6 +30,8 @@
 }
 
 * { box-sizing: border-box; }
+/* atrybut [hidden] musi wygrywać z regułami display klas (np. .segmented na #view-switch) */
+[hidden] { display: none !important; }
 
 html { -webkit-text-size-adjust: 100%; }
 
