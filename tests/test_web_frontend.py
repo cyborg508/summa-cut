@@ -32,7 +32,7 @@ REQUIRED_IDS = [
     "opos-side", "opos-bottom", "opos-top",
     "montage-enable", "montage-rows", "montage-add",
     "generate-btn", "summary", "error",
-    "preview-print", "preview-cut",
+    "preview-img", "preview-print-btn", "preview-cut-btn",
 ]
 
 
@@ -95,6 +95,22 @@ def test_app_js_has_editor_logic():
     assert "renderSpecialEditor" in js
 
 
+def test_preview_is_single_image_with_toggle():
+    from pathlib import Path
+    html = (Path(__file__).resolve().parents[1] / "web" / "static" / "index.html").read_text(encoding="utf-8")
+    assert 'id="preview-img"' in html
+    assert 'id="preview-print-btn"' in html and 'id="preview-cut-btn"' in html
+    assert 'id="preview-print"' not in html
+    assert 'id="preview-cut"' not in html
+
+
+def test_app_js_preview_toggle():
+    from pathlib import Path
+    js = (Path(__file__).resolve().parents[1] / "web" / "static" / "app.js").read_text(encoding="utf-8")
+    assert "previewWhich" in js
+    assert "preview-img" in js
+
+
 def test_app_js_invalidates_special_on_input_change():
     # Po przygotowaniu wykrojnika zmiana pliku/strony/spadu musi unieważnić
     # gotowość trybu specjalnego, inaczej collectParams() wysłałby stare
@@ -106,3 +122,23 @@ def test_app_js_invalidates_special_on_input_change():
         assert f'$("{el_id}").addEventListener' in js
     # wszystkie te wejścia wołają invalidateSpecial
     assert js.count("invalidateSpecial") >= 6
+
+
+def test_panel_has_view_switch_and_editor_in_panel():
+    from pathlib import Path
+    html = (Path(__file__).resolve().parents[1] / "web" / "static" / "index.html").read_text(encoding="utf-8")
+    assert 'id="view-switch"' in html
+    assert 'id="view-editor-btn"' in html and 'id="view-preview-btn"' in html
+    assert 'id="view-editor"' in html
+    panel = html.split('<section class="preview"', 1)[1]
+    assert 'id="special-editor"' in panel
+    assert 'id="special-row0"' in panel
+    controls = html.split('<section class="preview"', 1)[0]
+    assert 'id="special-prepare-btn"' in controls
+    assert 'id="special-enable"' in controls
+
+
+def test_app_js_view_switch():
+    from pathlib import Path
+    js = (Path(__file__).resolve().parents[1] / "web" / "static" / "app.js").read_text(encoding="utf-8")
+    assert "rightView" in js and "setRightView" in js
