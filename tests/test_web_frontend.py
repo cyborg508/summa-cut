@@ -122,3 +122,23 @@ def test_app_js_invalidates_special_on_input_change():
         assert f'$("{el_id}").addEventListener' in js
     # wszystkie te wejścia wołają invalidateSpecial
     assert js.count("invalidateSpecial") >= 6
+
+
+def test_panel_has_view_switch_and_editor_in_panel():
+    from pathlib import Path
+    html = (Path(__file__).resolve().parents[1] / "web" / "static" / "index.html").read_text(encoding="utf-8")
+    assert 'id="view-switch"' in html
+    assert 'id="view-editor-btn"' in html and 'id="view-preview-btn"' in html
+    assert 'id="view-editor"' in html
+    panel = html.split('<section class="preview"', 1)[1]
+    assert 'id="special-editor"' in panel
+    assert 'id="special-row0"' in panel
+    controls = html.split('<section class="preview"', 1)[0]
+    assert 'id="special-prepare-btn"' in controls
+    assert 'id="special-enable"' in controls
+
+
+def test_app_js_view_switch():
+    from pathlib import Path
+    js = (Path(__file__).resolve().parents[1] / "web" / "static" / "app.js").read_text(encoding="utf-8")
+    assert "rightView" in js and "setRightView" in js

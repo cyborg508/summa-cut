@@ -4,6 +4,7 @@ const uploads = {};          // name -> page_count
 let montage = [];            // [{label,print_upload,print_page,cut_upload,cut_page,quantity}]
 let previewTimer = null;
 let previewWhich = "print";  // który obraz pokazuje podgląd: "print" | "cut"
+let rightView = "preview";   // co pokazuje prawy panel: "editor" | "preview"
 // stan trybu specjalnego: po „Przygotuj" trzyma przycięte uploady i rozmiar kafla
 const special = { printUpload: null, cutUpload: null, pageW: 0, pageH: 0, ready: false };
 
@@ -162,6 +163,12 @@ function wireEvents() {
   $("generate-btn").addEventListener("click", doGenerate);
   $("preview-print-btn").addEventListener("click", () => setPreviewWhich("print"));
   $("preview-cut-btn").addEventListener("click", () => setPreviewWhich("cut"));
+  $("view-editor-btn").addEventListener("click", () => setRightView("editor"));
+  $("view-preview-btn").addEventListener("click", () => setRightView("preview"));
+  for (const id of ["special-row0","special-row1","special-col0","special-col1",
+                    "special-colx0","special-colx1","special-rowy0","special-rowy1"]) {
+    $(id).addEventListener("input", () => { renderSpecialEditor(); schedulePreview(); });
+  }
   $("montage-add").addEventListener("click", () => { addMontageRow(); schedulePreview(); });
   $("montage-enable").addEventListener("change", onMontageToggle);
   $("special-enable").addEventListener("change", onSpecialToggle);
@@ -268,7 +275,9 @@ function onMontageToggle() {
 function onSpecialToggle() {
   const on = $("special-enable").checked;
   $("special-body").hidden = !on;
+  $("view-switch").hidden = !on;
   updateGapLock();
+  setRightView(on ? "editor" : "preview");
   schedulePreview();
 }
 
@@ -335,6 +344,7 @@ async function doSpecialPrepare() {
   tileImgUrl = `/api/special/tile.png?t=${Date.now()}`;
   selectedTile = [1, 1];
   renderSpecialEditor();
+  setRightView("editor");
   status.textContent = `Gotowe: kafel ${b.page_width_mm.toFixed(1)}×${b.page_height_mm.toFixed(1)} mm`;
   schedulePreview();
 }
@@ -445,6 +455,16 @@ async function applyJob() {
   }
   showError((await r.json()).detail || "Błąd układu.");
   return false;
+}
+
+function setRightView(view) {
+  rightView = view;
+  const editorOn = view === "editor";
+  $("view-editor").hidden = !editorOn;
+  $("view-preview").hidden = editorOn;
+  $("view-editor-btn").classList.toggle("active", editorOn);
+  $("view-preview-btn").classList.toggle("active", !editorOn);
+  if (editorOn) renderSpecialEditor();
 }
 
 function setPreviewWhich(which) {

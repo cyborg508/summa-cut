@@ -67,21 +67,6 @@
           <label>spad mm <input type="number" id="special-bleed" value="3" step="0.1" min="0"></label>
           <button type="button" id="special-prepare-btn">Przygotuj wykrojnik</button>
           <span id="special-status" class="special-status"></span>
-          <div class="special-editor-wrap">
-            <svg id="special-editor" viewBox="0 0 300 260" tabindex="0" role="img" aria-label="Edytor układu 3×3"></svg>
-            <p id="special-legend" class="special-legend">Przeciągnij kafel: <b>bez Shift</b> = przesuń rząd/kolumnę; <b>z Shiftem</b> = zmień odstęp rzędów/kolumn. Strzałki = krok 0,1 mm.</p>
-          </div>
-          <details class="special-offsets">
-            <summary>Dostrojenie ręczne (mm)</summary>
-            <label>rząd 0 X <input type="number" id="special-row0" value="0" step="0.1"></label>
-            <label>rząd 1 X <input type="number" id="special-row1" value="0" step="0.1"></label>
-            <label>kol. 0 Y <input type="number" id="special-col0" value="0" step="0.1"></label>
-            <label>kol. 1 Y <input type="number" id="special-col1" value="0" step="0.1"></label>
-            <label>kol. 0 X <input type="number" id="special-colx0" value="0" step="0.1"></label>
-            <label>kol. 1 X <input type="number" id="special-colx1" value="0" step="0.1"></label>
-            <label>rząd 0 Y <input type="number" id="special-rowy0" value="0" step="0.1"></label>
-            <label>rząd 1 Y <input type="number" id="special-rowy1" value="0" step="0.1"></label>
-          </details>
         </div>
       </fieldset>
 
@@ -95,6 +80,29 @@
     <section class="preview" id="panel">
       <div id="error" class="error" hidden></div>
       <div id="summary" class="summary">Wgraj PDF i ustaw parametry.</div>
+      <div class="segmented" id="view-switch" hidden>
+        <button type="button" id="view-editor-btn" class="seg-btn active">Edytor 3×3</button>
+        <button type="button" id="view-preview-btn" class="seg-btn">Podgląd</button>
+      </div>
+
+      <div id="view-editor" hidden>
+        <div class="special-editor-wrap">
+          <svg id="special-editor" viewBox="0 0 300 260" tabindex="0" role="img" aria-label="Edytor układu 3×3"></svg>
+          <p id="special-legend" class="special-legend">Przeciągnij kafel: <b>bez Shift</b> = przesuń rząd/kolumnę; <b>z Shiftem</b> = zmień odstęp rzędów/kolumn. Strzałki = krok 0,1 mm.</p>
+        </div>
+        <details class="special-offsets">
+          <summary>Dostrojenie ręczne (mm)</summary>
+          <label>rząd 0 X <input type="number" id="special-row0" value="0" step="0.1"></label>
+          <label>rząd 1 X <input type="number" id="special-row1" value="0" step="0.1"></label>
+          <label>kol. 0 Y <input type="number" id="special-col0" value="0" step="0.1"></label>
+          <label>kol. 1 Y <input type="number" id="special-col1" value="0" step="0.1"></label>
+          <label>kol. 0 X <input type="number" id="special-colx0" value="0" step="0.1"></label>
+          <label>kol. 1 X <input type="number" id="special-colx1" value="0" step="0.1"></label>
+          <label>rząd 0 Y <input type="number" id="special-rowy0" value="0" step="0.1"></label>
+          <label>rząd 1 Y <input type="number" id="special-rowy1" value="0" step="0.1"></label>
+        </details>
+      </div>
+
       <div id="view-preview">
         <div class="segmented" id="preview-toggle">
           <button type="button" id="preview-print-btn" class="seg-btn active">Druk</button>
