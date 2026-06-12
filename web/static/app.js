@@ -199,6 +199,7 @@ function wireEvents() {
 async function doUpload() {
   const files = $("upload-input").files;
   if (!files.length) return;
+  const newNames = [];
   for (const f of files) {
     const fd = new FormData();
     fd.append("file", f);
@@ -206,13 +207,41 @@ async function doUpload() {
     if (r.ok) {
       const info = await r.json();
       uploads[info.name] = info.page_count;
+      newNames.push(info.name);
     } else {
       showError((await r.json()).detail || "Błąd wgrywania.");
     }
   }
   renderUploads();
   refreshFileSelectors();
+  autoAssignSources(newNames);
   schedulePreview();
+}
+
+// Po wgraniu ustawia DOMYŚLNE źródła, ale TYLKO gdy pole jest puste (nigdy nie nadpisuje
+// ręcznego wyboru). Reguła: 1. plik → druk (str.1); jeśli ten plik ma ≥2 strony →
+// wykrojnik = ten sam plik, str.2; jeśli druk już ustawiony, a wykrojnik pusty →
+// kolejny wgrany plik = wykrojnik (str.1). Przetwarza nowe pliki w kolejności wgrania.
+function autoAssignSources(names) {
+  for (const name of names) {
+    const pages = uploads[name] || 0;
+    if (!$("print-file").value) {
+      assignSource("print-file", "print-page", name, 0);
+      if (pages >= 2 && !$("cut-file").value) {
+        assignSource("cut-file", "cut-page", name, 1);
+      }
+    } else if (!$("cut-file").value) {
+      assignSource("cut-file", "cut-page", name, 0);
+    }
+  }
+}
+
+// Ustawia plik + stronę w parze selektów (opcje już wypełnione przez refreshFileSelectors).
+function assignSource(fileId, pageId, name, page) {
+  $(fileId).value = name;
+  fillPages(fileId, pageId);               // odśwież listę stron dla wybranego pliku
+  const pages = uploads[name] || 0;
+  $(pageId).value = String(page < pages ? page : 0);
 }
 
 function renderUploads() {
