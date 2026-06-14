@@ -83,7 +83,7 @@ Aplikacja: http://127.0.0.1:8000
 docker compose up --build
 ```
 
-Domyślnie wystawia port `8800` → `8000` w kontenerze (zob. `compose.yaml`). Produkcyjnie działa jako TrueNAS Custom App za centralnym reverse proxy (Caddy + Let's Encrypt/Cloudflare DNS-01) pod `summa.cyplos.pl` — szczegóły w [`deploy/HTTPS-truenas-app.md`](deploy/HTTPS-truenas-app.md).
+Domyślnie wystawia port `8800` → `8000` w kontenerze (zob. `compose.yaml`). Produkcyjnie działa za reverse proxy z HTTPS pod `summa.cyplos.pl`.
 
 ---
 
