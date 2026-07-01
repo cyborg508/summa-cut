@@ -3,6 +3,11 @@ FROM python:3.12-slim
 WORKDIR /app
 ENV PYTHONUNBUFFERED=1 PIP_NO_CACHE_DIR=1
 
+# Ghostscript: spłaszczanie wykrojnika (Form XObjecty → natywne ścieżki) przy zapisie,
+# żeby SummaWinPlot nie przesuwał konturów względem OPOS.
+RUN apt-get update && apt-get install -y --no-install-recommends ghostscript \
+    && rm -rf /var/lib/apt/lists/*
+
 COPY requirements-web.txt .
 RUN pip install -r requirements-web.txt
 

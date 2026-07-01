@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import shutil
+import subprocess
 from dataclasses import dataclass
 from io import BytesIO
 from pathlib import Path
@@ -279,6 +281,37 @@ def generate_output_docs(job: JobSettings, layout: LayoutResult) -> OutputDocs:
     return OutputDocs(print_doc=print_doc, cut_doc=cut_doc)
 
 
+def _find_ghostscript() -> str | None:
+    for name in ("gs", "gswin64c", "gswin32c"):
+        path = shutil.which(name)
+        if path:
+            return path
+    return None
+
+
+def flatten_pdf_bytes(pdf_bytes: bytes) -> bytes:
+    """Spłaszcza Form XObjecty do natywnych ścieżek (Ghostscript pdfwrite).
+
+    Po co: SummaWinPlot importuje wykrojnik jako PDF, ale jego parser obsługuje
+    Form XObjecty (nasze stemple konturów przez pikepdf `add_overlay`) inaczej niż
+    zgodny renderer — kontury przesuwają się względem natywnie rysowanych OPOS-ów.
+    Po spłaszczeniu wszystko jest natywnymi ścieżkami w jednej przestrzeni (jak w
+    EPS, który u usera działa). Podgląd/druk nie ruszamy — to dotyczy tylko zapisu
+    wykrojnika. Weryfikacja: user potwierdził spłaszczony PDF w SummaWinPlot 2026-07-01.
+    """
+    gs = _find_ghostscript()
+    if gs is None:
+        raise RuntimeError(
+            "Ghostscript (gs) jest wymagany do spłaszczenia wykrojnika, ale go nie znaleziono."
+        )
+    proc = subprocess.run(
+        [gs, "-q", "-dNOPAUSE", "-dBATCH", "-dSAFER", "-sDEVICE=pdfwrite",
+         "-dCompatibilityLevel=1.5", "-sOutputFile=%stdout", "-"],
+        input=pdf_bytes, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True,
+    )
+    return proc.stdout
+
+
 def save_output_docs(output_docs: OutputDocs, target_dir: str | Path, base_name: str = "wynik") -> tuple[Path, Path]:
     target = Path(target_dir)
     target.mkdir(parents=True, exist_ok=True)
@@ -286,5 +319,6 @@ def save_output_docs(output_docs: OutputDocs, target_dir: str | Path, base_name:
     print_path = target / f'{safe_base_name}_druk.pdf'
     cut_path = target / f'{safe_base_name}_wykrojnik.pdf'
     output_docs.print_doc.save(print_path)
-    output_docs.cut_doc.save(cut_path)
+    # Wykrojnik spłaszczamy (SummaWinPlot vs Form XObjecty); druk zostaje bez zmian.
+    cut_path.write_bytes(flatten_pdf_bytes(output_docs.cut_doc.tobytes()))
     return print_path, cut_path

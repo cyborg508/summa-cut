@@ -5,10 +5,12 @@ przed regresją: liczba użytków nie może mnożyć otwarć pliku źródłowego
 """
 from __future__ import annotations
 
+import shutil
 import tempfile
 from pathlib import Path
 
 import fitz
+import pikepdf
 import pytest
 
 from summa_cut import export as E
@@ -91,6 +93,54 @@ def test_save_writes_both_pdfs(source_pdf, tmp_path):
     assert print_path.name == "moj_plik_druk.pdf"
     assert cut_path.name == "moj_plik_wykrojnik.pdf"
     assert print_path.stat().st_size > 1000 and cut_path.stat().st_size > 1000
+
+
+def _page_xobject_count(pdf_path: Path) -> int:
+    with pikepdf.open(pdf_path) as pdf:
+        page = pdf.pages[0]
+        res = page.Resources
+        if "/XObject" not in res:
+            return 0
+        return len(list(res.XObject.keys()))
+
+
+@pytest.mark.skipif(shutil.which("gs") is None, reason="Ghostscript (gs) niedostępny")
+def test_saved_cut_pdf_is_flattened_no_form_xobjects(source_pdf, tmp_path):
+    """Wykrojnik zapisany na dysk musi mieć kontury jako natywne ścieżki
+    (0 Form XObjectów) — inaczej SummaWinPlot przesuwa je względem OPOS.
+
+    Druk zostaje z XObjectami (idzie na drukarkę) — nie sprawdzamy go tu.
+    """
+    job = _job(source_pdf, item=30.0)
+    layout = compute_layout(job)
+    assert layout.count > 50  # wiele użytków = wiele stempli XObject przed spłaszczeniem
+    docs = E.generate_output_docs(job, layout)
+    try:
+        _, cut_path = E.save_output_docs(docs, tmp_path / "out", base_name="plik")
+    finally:
+        docs.print_doc.close()
+        docs.cut_doc.close()
+    assert _page_xobject_count(cut_path) == 0, "wykrojnik nie został spłaszczony (są Form XObjecty)"
+
+
+@pytest.mark.skipif(shutil.which("gs") is None, reason="Ghostscript (gs) niedostępny")
+def test_flattened_cut_is_visually_equal_to_unflattened(source_pdf, tmp_path):
+    """Spłaszczenie nie może zmienić geometrii — render spłaszczonego wykrojnika
+    musi się pokrywać z renderem przed spłaszczeniem (kontury + OPOS na miejscu)."""
+    from render_util import fraction_differing, render_page_png
+
+    job = _job(source_pdf, item=30.0)
+    layout = compute_layout(job)
+    docs = E.generate_output_docs(job, layout)
+    try:
+        before = render_page_png(docs.cut_doc)
+        _, cut_path = E.save_output_docs(docs, tmp_path / "out", base_name="plik")
+    finally:
+        docs.print_doc.close()
+        docs.cut_doc.close()
+    with fitz.open(cut_path) as flat:
+        after = render_page_png(flat)
+    assert fraction_differing(before, after) < 0.01
 
 
 def test_gapless_mode_does_not_open_cut_source(source_pdf, monkeypatch):
