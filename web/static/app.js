@@ -220,6 +220,7 @@ async function doUpload() {
   renderUploads();
   refreshFileSelectors();
   autoAssignSources(newNames);
+  if (manualState.enabled) renderPalette();
   schedulePreview();
 }
 
@@ -387,7 +388,7 @@ async function doSpecialPrepare() {
 
 // Fieldsety auto-układu chowane w trybie manualnym (po legendach).
 function autoLayoutFieldsets() {
-  const legends = ["Źródło (gdy bez montażu)", "Arkusz i użytek (mm)", "Tryb", "Montaż wielu użytków"];
+  const legends = ["Źródło (gdy bez montażu)", "Użytek (mm)", "Tryb", "Montaż wielu użytków"];
   return Array.from(document.querySelectorAll("#controls fieldset")).filter((fs) => {
     const lg = fs.querySelector("legend");
     return lg && legends.includes(lg.textContent.trim());
