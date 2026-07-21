@@ -42,6 +42,7 @@
         <label><input type="checkbox" id="split"> podział na 2 grupy (góra/dół)</label>
         <label><input type="checkbox" id="split-spread"> dociśnij do skraju</label>
         <label><input type="checkbox" id="manual"> siatka manualna</label>
+        <label><input type="checkbox" id="manual-free"> tryb manualny (ręczna impozycja)</label>
         <label>kol. <input type="number" id="manual-cols" value="0" step="1" min="0"></label>
         <label>rzędy <input type="number" id="manual-rows" value="0" step="1" min="0"></label>
       </fieldset>
@@ -58,6 +59,15 @@
         <label><input type="checkbox" id="montage-enable"> włącz montaż (wymaga trybu z odstępami)</label>
         <div id="montage-rows"></div>
         <button type="button" id="montage-add">+ dodaj użytek</button>
+      </fieldset>
+
+      <fieldset id="manual-panel" style="display:none">
+        <legend>Tryb manualny</legend>
+        <p id="manual-hint" class="muted">Kliknij użytek w palecie, aby dodać go na arkusz. Przeciągaj myszą; strzałki = przesuw, R = obrót 90°, D = duplikuj, Delete = usuń.</p>
+        <div id="manual-palette" class="palette"></div>
+        <div class="manual-canvas-wrap">
+          <svg id="manual-canvas" xmlns="http://www.w3.org/2000/svg"></svg>
+        </div>
       </fieldset>
 
       <fieldset class="special">
