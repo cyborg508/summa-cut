@@ -70,3 +70,33 @@ def test_build_manual_layout_rejects_bad_index():
     job = _job([_item(40, 30, 0)])
     with pytest.raises(ValueError):
         build_manual_layout(job, [ManualPlacement(item_index=5, x_mm=0, y_mm=0, rotation_deg=0)])
+
+
+from summa_cut.manual_layout import validate_manual_placements
+
+
+def test_validate_ok_when_inside_and_disjoint():
+    job = _job([_item(40, 30, 0), _item(40, 30, 1)])
+    layout = build_manual_layout(job, [
+        ManualPlacement(0, 20.0, 50.0, 0),
+        ManualPlacement(1, 80.0, 50.0, 0),
+    ])
+    assert validate_manual_placements(job, layout) == []
+
+
+def test_validate_flags_out_of_work_area():
+    job = _job([_item(40, 30, 0)])
+    # y=0 jest powyżej górnego offsetu OPOS (top=40) → poza obszarem
+    layout = build_manual_layout(job, [ManualPlacement(0, 20.0, 0.0, 0)])
+    problems = validate_manual_placements(job, layout)
+    assert problems and any("poza" in p.lower() for p in problems)
+
+
+def test_validate_flags_overlap():
+    job = _job([_item(40, 30, 0), _item(40, 30, 1)])
+    layout = build_manual_layout(job, [
+        ManualPlacement(0, 50.0, 60.0, 0),
+        ManualPlacement(1, 60.0, 70.0, 0),   # nachodzi na pierwszy
+    ])
+    problems = validate_manual_placements(job, layout)
+    assert problems and any("nachodz" in p.lower() for p in problems)
