@@ -177,6 +177,7 @@ function wireEvents() {
   $("special-enable").addEventListener("change", onSpecialToggle);
   $("special-prepare-btn").addEventListener("click", doSpecialPrepare);
   $("manual-free").addEventListener("change", onManualToggle);
+  document.addEventListener("keydown", mcKey);
   // każda zmiana kontrolki → przeliczenie podglądu (debounce)
   $("controls").addEventListener("input", schedulePreview);
   $("controls").addEventListener("change", schedulePreview);
@@ -502,6 +503,47 @@ function renderCanvas() {
     add("text", { x: (p.xMm + 2) * MC_SCALE, y: (p.yMm + 4) * MC_SCALE }, "mc-label")
       .textContent = `#${i + 1}${p.rot ? " " + p.rot + "°" : ""}`;
   });
+}
+
+function mcRotateSelected() {
+  const p = manualState.placements[manualState.selected];
+  if (!p) return;
+  p.rot = (p.rot + 90) % 360;
+  [p.wMm, p.hMm] = [p.hMm, p.wMm];
+  renderCanvas();
+}
+
+function mcDuplicateSelected() {
+  const p = manualState.placements[manualState.selected];
+  if (!p) return;
+  manualState.placements.push({ ...p, xMm: Math.round((p.xMm + 5) * 10) / 10, yMm: Math.round((p.yMm + 5) * 10) / 10 });
+  manualState.selected = manualState.placements.length - 1;
+  renderCanvas();
+}
+
+function mcDeleteSelected() {
+  if (manualState.selected == null) return;
+  manualState.placements.splice(manualState.selected, 1);
+  manualState.selected = null;
+  renderCanvas();
+}
+
+function mcNudge(dx, dy) {
+  const p = manualState.placements[manualState.selected];
+  if (!p) return;
+  p.xMm = Math.round((p.xMm + dx) * 10) / 10;
+  p.yMm = Math.round((p.yMm + dy) * 10) / 10;
+  renderCanvas();
+}
+
+function mcKey(e) {
+  if (!manualState.enabled || manualState.selected == null) return;
+  const step = e.shiftKey ? 10 : 1;
+  const map = { ArrowLeft: [-step, 0], ArrowRight: [step, 0], ArrowUp: [0, -step], ArrowDown: [0, step] };
+  if (map[e.key]) { e.preventDefault(); mcNudge(...map[e.key]); return; }
+  if (e.key === "r" || e.key === "R") { e.preventDefault(); mcRotateSelected(); }
+  else if (e.key === "d" || e.key === "D") { e.preventDefault(); mcDuplicateSelected(); }
+  else if (e.key === "Delete" || e.key === "Backspace") { e.preventDefault(); mcDeleteSelected(); }
 }
 
 let mcDrag = null;   // { idx, startX, startY, origX, origY }
