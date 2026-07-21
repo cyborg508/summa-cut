@@ -262,3 +262,35 @@ def test_build_job_special_requires_cut_upload(tmp_path):
     )
     with pytest.raises(ValueError):
         build_job(params, session)
+
+
+def test_build_manual_job_builds_montage_items_from_palette(tmp_path):
+    import fitz
+    from summa_cut.pdf_io import MM_PER_POINT, read_pdf_info
+    from web.job_builder import JobParams, build_job
+    from web.sessions import SessionStore
+
+    PT = 1.0 / MM_PER_POINT
+    doc = fitz.open()
+    doc.new_page(width=40 * PT, height=30 * PT)
+    doc.new_page(width=40 * PT, height=30 * PT)
+    path = tmp_path / "para.pdf"
+    doc.save(path); doc.close()
+
+    store = SessionStore(base_dir=tmp_path / "sess")
+    session = store.create()
+    session.uploads["para.pdf"] = read_pdf_info(str(path))
+
+    params = JobParams(
+        print_upload="para.pdf", item_w_mm=0, item_h_mm=0,
+        manual_free_enabled=True,
+        manual_items=[{"upload": "para.pdf"}],
+        manual_placements=[{"item_index": 0, "x_mm": 20, "y_mm": 50, "rotation_deg": 0}],
+        opos_side_offset_mm=10, opos_bottom_offset_mm=10, opos_top_offset_mm=40,
+    )
+    job = build_job(params, session)
+    assert len(job.montage_items) == 1
+    item = job.montage_items[0]
+    assert item.print_page.page_index == 0
+    assert item.cut_page.page_index == 1
+    assert item.print_page_size_mm == (40.0, 30.0)

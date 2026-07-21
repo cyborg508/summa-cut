@@ -15,6 +15,17 @@ class MontageItemParams(BaseModel):
     quantity: int = 1
 
 
+class ManualItemParams(BaseModel):
+    upload: str
+
+
+class ManualPlacementParams(BaseModel):
+    item_index: int
+    x_mm: float
+    y_mm: float
+    rotation_deg: int = 0
+
+
 class JobParams(BaseModel):
     """Parametry zlecenia. `montage` niepuste → montaż wielu użytków; puste → pojedynczy produkt."""
     print_upload: str
@@ -42,6 +53,10 @@ class JobParams(BaseModel):
     opos_top_offset_mm: float = Field(default=40.0)
 
     montage: list[MontageItemParams] = Field(default_factory=list)
+
+    manual_free_enabled: bool = False
+    manual_items: list[ManualItemParams] = Field(default_factory=list)
+    manual_placements: list[ManualPlacementParams] = Field(default_factory=list)
 
     special_enabled: bool = False
     special_row_offsets_mm: list[float] = Field(default_factory=lambda: [0.0, 0.0])
@@ -133,7 +148,49 @@ def _build_special_job(params: JobParams, session: Session) -> JobSettings:
     )
 
 
+def _build_manual_job(params: JobParams, session: Session) -> JobSettings:
+    items: list[MontageItem] = []
+    for idx, mi in enumerate(params.manual_items):
+        p_info = _require_page(session, mi.upload, 0, f"druk palety #{idx + 1}")
+        c_info = _require_page(session, mi.upload, 1, f"wykrojnik palety #{idx + 1}")
+        items.append(MontageItem(
+            label=mi.upload,
+            print_page=SelectedPage(p_info.path, 0),
+            cut_page=SelectedPage(c_info.path, 1),
+            print_page_size_mm=p_info.page_sizes_mm[0],
+            cut_page_size_mm=c_info.page_sizes_mm[1],
+            print_content_size_mm=p_info.page_content_sizes_mm[0],
+            cut_content_size_mm=c_info.page_content_sizes_mm[1],
+            print_content_bbox_pt=p_info.page_content_boxes_pt[0],
+            cut_content_bbox_pt=c_info.page_content_boxes_pt[1],
+            quantity=1,
+        ))
+    base = items[0] if items else None
+    empty_page = SelectedPage("", 0)
+    zero_bbox = (0.0, 0.0, 0.0, 0.0)
+    return JobSettings(
+        print_page=base.print_page if base else empty_page,
+        cut_page=base.cut_page if base else empty_page,
+        print_page_size_mm=base.print_page_size_mm if base else (0.0, 0.0),
+        cut_page_size_mm=base.cut_page_size_mm if base else (0.0, 0.0),
+        print_content_size_mm=base.print_content_size_mm if base else (0.0, 0.0),
+        cut_content_size_mm=base.cut_content_size_mm if base else (0.0, 0.0),
+        print_content_bbox_pt=base.print_content_bbox_pt if base else zero_bbox,
+        cut_content_bbox_pt=base.cut_content_bbox_pt if base else zero_bbox,
+        sheet_spec=SheetSpec(params.sheet_w_mm, params.sheet_h_mm),
+        item_spec=ItemSpec(0.0, 0.0, False),
+        gap_enabled=True,
+        gap_mm=0.0,
+        generate_cut_grid=False,
+        montage_items=items,
+        opos_spec=OposSpec(params.opos_side_offset_mm, params.opos_bottom_offset_mm, params.opos_top_offset_mm),
+    )
+
+
 def build_job(params: JobParams, session: Session) -> JobSettings:
+    if params.manual_free_enabled:
+        return _build_manual_job(params, session)
+
     if not params.special_enabled and (params.item_w_mm <= 0 or params.item_h_mm <= 0):
         raise ValueError("Rozmiar użytku musi być większy od zera.")
     if params.sheet_w_mm <= 0 or params.sheet_h_mm <= 0:
