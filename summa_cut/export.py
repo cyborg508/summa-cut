@@ -50,7 +50,7 @@ def _centered_clip_rect_pt(
 ) -> fitz.Rect:
     clip_w_pt = mm_to_pt(clip_width_mm)
     clip_h_pt = mm_to_pt(clip_height_mm)
-    if rotation_deg == 90:
+    if rotation_deg in (90, 270):
         clip_w_pt, clip_h_pt = clip_h_pt, clip_w_pt
     content_rect = fitz.Rect(content_bbox_pt)
     cx = (content_rect.x0 + content_rect.x1) / 2.0

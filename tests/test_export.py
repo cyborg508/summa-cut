@@ -157,3 +157,18 @@ def test_gapless_mode_does_not_open_cut_source(source_pdf, monkeypatch):
     finally:
         docs.print_doc.close()
         docs.cut_doc.close()
+
+
+def test_centered_clip_swaps_dims_for_270():
+    import fitz
+    from summa_cut.export import _centered_clip_rect_pt, mm_to_pt
+    page_rect = fitz.Rect(0, 0, mm_to_pt(100), mm_to_pt(100))
+    content_bbox = (0.0, 0.0, mm_to_pt(100), mm_to_pt(100))
+    # clip 30 (szer.) x 10 (wys.) mm; przy 90 i 270 footprint jest obrócony,
+    # więc okno przycięcia musi mieć 10 (szer.) x 30 (wys.) mm.
+    r90 = _centered_clip_rect_pt(page_rect, content_bbox, 30.0, 10.0, 90)
+    r270 = _centered_clip_rect_pt(page_rect, content_bbox, 30.0, 10.0, 270)
+    assert round(r270.width, 3) == round(r90.width, 3)
+    assert round(r270.height, 3) == round(r90.height, 3)
+    assert round(r270.width, 1) == round(mm_to_pt(10.0), 1)
+    assert round(r270.height, 1) == round(mm_to_pt(30.0), 1)
