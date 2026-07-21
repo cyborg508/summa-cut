@@ -538,6 +538,8 @@ function mcNudge(dx, dy) {
 
 function mcKey(e) {
   if (!manualState.enabled || manualState.selected == null) return;
+  const tag = e.target && e.target.tagName;
+  if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || (e.target && e.target.isContentEditable)) return;
   const step = e.shiftKey ? 10 : 1;
   const map = { ArrowLeft: [-step, 0], ArrowRight: [step, 0], ArrowUp: [0, -step], ArrowDown: [0, step] };
   if (map[e.key]) { e.preventDefault(); mcNudge(...map[e.key]); return; }
