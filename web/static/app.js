@@ -1,12 +1,15 @@
 "use strict";
 const $ = (id) => document.getElementById(id);
 const uploads = {};          // name -> page_count
+const uploadsInfo = {};      // name -> pełny obiekt z /api/upload (page_sizes_mm, ...)
 let montage = [];            // [{label,print_upload,print_page,cut_upload,cut_page,quantity}]
 let previewTimer = null;
 let previewWhich = "print";  // który obraz pokazuje podgląd: "print" | "cut"
 let rightView = "preview";   // co pokazuje prawy panel: "editor" | "preview"
 // stan trybu specjalnego: po „Przygotuj" trzyma przycięte uploady i rozmiar kafla
 const special = { printUpload: null, cutUpload: null, pageW: 0, pageH: 0, ready: false };
+const manualState = { enabled: false, items: [], placements: [], selected: null };
+// items: [{ upload }]   placements: [{ itemIndex, xMm, yMm, rot, wMm, hMm }]
 
 // --- Edytor 3×3 trybu specjalnego -------------------------------------------
 let selectedTile = [1, 1];     // [row, col] aktywnego kafla (domyślnie środek)
@@ -173,6 +176,7 @@ function wireEvents() {
   $("montage-enable").addEventListener("change", onMontageToggle);
   $("special-enable").addEventListener("change", onSpecialToggle);
   $("special-prepare-btn").addEventListener("click", doSpecialPrepare);
+  $("manual-free").addEventListener("change", onManualToggle);
   // każda zmiana kontrolki → przeliczenie podglądu (debounce)
   $("controls").addEventListener("input", schedulePreview);
   $("controls").addEventListener("change", schedulePreview);
@@ -207,6 +211,7 @@ async function doUpload() {
     if (r.ok) {
       const info = await r.json();
       uploads[info.name] = info.page_count;
+      uploadsInfo[info.name] = info;   // pełne info (page_sizes_mm itd.)
       newNames.push(info.name);
     } else {
       showError((await r.json()).detail || "Błąd wgrywania.");
@@ -377,6 +382,78 @@ async function doSpecialPrepare() {
   status.textContent = `Gotowe: kafel ${b.page_width_mm.toFixed(1)}×${b.page_height_mm.toFixed(1)} mm`;
   schedulePreview();
 }
+
+// --- Tryb manualny (montaż wolny) -------------------------------------------
+
+// Fieldsety auto-układu chowane w trybie manualnym (po legendach).
+function autoLayoutFieldsets() {
+  const legends = ["Źródło (gdy bez montażu)", "Arkusz i użytek (mm)", "Tryb", "Montaż wielu użytków"];
+  return Array.from(document.querySelectorAll("#controls fieldset")).filter((fs) => {
+    const lg = fs.querySelector("legend");
+    return lg && legends.includes(lg.textContent.trim());
+  });
+}
+
+function onManualToggle() {
+  manualState.enabled = $("manual-free").checked;
+  $("manual-panel").style.display = manualState.enabled ? "" : "none";
+  for (const fs of autoLayoutFieldsets()) {
+    // „Tryb" zostawiamy widoczny (jest w nim przełącznik manualny); reszta znika.
+    const isModeFs = fs.querySelector("legend").textContent.trim() === "Tryb";
+    if (!isModeFs) fs.style.display = manualState.enabled ? "none" : "";
+  }
+  if (manualState.enabled) { renderPalette(); renderCanvas(); }
+}
+
+// Paleta = wgrane PDF-y mające >= 2 strony (str.0=druk, str.1=wykrojnik).
+function renderPalette() {
+  const box = $("manual-palette");
+  box.innerHTML = "";
+  const names = Object.keys(uploads).filter((n) => (uploads[n] || 0) >= 2);
+  if (names.length === 0) {
+    box.innerHTML = '<span class="muted">Wgraj PDF 2-stronicowy (str.1 druk, str.2 wykrojnik).</span>';
+    return;
+  }
+  names.forEach((name) => {
+    const chip = document.createElement("button");
+    chip.type = "button";
+    chip.className = "palette-chip";
+    chip.textContent = name;
+    chip.addEventListener("click", () => addInstance(name));
+    box.appendChild(chip);
+  });
+}
+
+function itemIndexForUpload(name) {
+  let idx = manualState.items.findIndex((it) => it.upload === name);
+  if (idx === -1) { manualState.items.push({ upload: name }); idx = manualState.items.length - 1; }
+  return idx;
+}
+
+function addInstance(name) {
+  const info = uploadsInfo[name];
+  if (!info) return;
+  const [wMm, hMm] = info.page_sizes_mm[0];
+  const itemIndex = itemIndexForUpload(name);
+  // domyślnie w środku obszaru roboczego OPOS
+  const wa = workAreaMm();
+  const xMm = wa.x + Math.max((wa.w - wMm) / 2, 0);
+  const yMm = wa.y + Math.max((wa.h - hMm) / 2, 0);
+  manualState.placements.push({ itemIndex, xMm, yMm, rot: 0, wMm, hMm });
+  manualState.selected = manualState.placements.length - 1;
+  renderCanvas();
+}
+
+function workAreaMm() {
+  const sw = parseFloat($("sheet-w").value) || 0;
+  const sh = parseFloat($("sheet-h").value) || 0;
+  const side = parseFloat($("opos-side").value) || 0;
+  const top = parseFloat($("opos-top").value) || 0;
+  const bottom = parseFloat($("opos-bottom").value) || 0;
+  return { x: side, y: top, w: Math.max(sw - 2 * side, 0), h: Math.max(sh - top - bottom, 0) };
+}
+
+function renderCanvas() { /* implementacja w Task 8 */ }
 
 function addMontageRow() {
   montage.push({ label: "", print_upload: "", print_page: 0, cut_upload: "", cut_page: 0, quantity: 1 });
