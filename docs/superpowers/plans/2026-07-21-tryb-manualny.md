@@ -64,7 +64,7 @@ def test_centered_clip_swaps_dims_for_270():
 
 - [ ] **Step 2: Uruchom test — ma NIE przejść**
 
-Run: `cd ~/summa-cut && .venv/bin/pytest tests/test_export.py::test_centered_clip_swaps_dims_for_270 -v`
+Run: `cd ~/summa-cut && .venv/bin/python -m pytest tests/test_export.py::test_centered_clip_swaps_dims_for_270 -v`
 Expected: FAIL (dla 270° wymiary nie są zamienione, więc `r270.width != r90.width`).
 
 - [ ] **Step 3: Popraw warunek zamiany**
@@ -85,12 +85,12 @@ na:
 
 - [ ] **Step 4: Uruchom test — ma przejść**
 
-Run: `cd ~/summa-cut && .venv/bin/pytest tests/test_export.py::test_centered_clip_swaps_dims_for_270 -v`
+Run: `cd ~/summa-cut && .venv/bin/python -m pytest tests/test_export.py::test_centered_clip_swaps_dims_for_270 -v`
 Expected: PASS
 
 - [ ] **Step 5: Uruchom cały plik eksportu (brak regresji)**
 
-Run: `cd ~/summa-cut && .venv/bin/pytest tests/test_export.py tests/test_export_fidelity.py -q`
+Run: `cd ~/summa-cut && .venv/bin/python -m pytest tests/test_export.py tests/test_export_fidelity.py -q`
 Expected: PASS (wszystkie)
 
 - [ ] **Step 6: Commit**
@@ -193,7 +193,7 @@ def test_build_manual_layout_rejects_bad_index():
 
 - [ ] **Step 2: Uruchom test — ma NIE przejść**
 
-Run: `cd ~/summa-cut && .venv/bin/pytest tests/test_manual_layout.py -v`
+Run: `cd ~/summa-cut && .venv/bin/python -m pytest tests/test_manual_layout.py -v`
 Expected: FAIL z `ModuleNotFoundError: No module named 'summa_cut.manual_layout'`
 
 - [ ] **Step 3: Zaimplementuj moduł**
@@ -261,7 +261,7 @@ def build_manual_layout(job: JobSettings, placements: list[ManualPlacement]) -> 
 
 - [ ] **Step 4: Uruchom test — ma przejść**
 
-Run: `cd ~/summa-cut && .venv/bin/pytest tests/test_manual_layout.py -v`
+Run: `cd ~/summa-cut && .venv/bin/python -m pytest tests/test_manual_layout.py -v`
 Expected: PASS (4 testy)
 
 - [ ] **Step 5: Commit**
@@ -320,7 +320,7 @@ def test_validate_flags_overlap():
 
 - [ ] **Step 2: Uruchom testy — mają NIE przejść**
 
-Run: `cd ~/summa-cut && .venv/bin/pytest tests/test_manual_layout.py -k validate -v`
+Run: `cd ~/summa-cut && .venv/bin/python -m pytest tests/test_manual_layout.py -k validate -v`
 Expected: FAIL z `ImportError: cannot import name 'validate_manual_placements'`
 
 - [ ] **Step 3: Zaimplementuj walidację**
@@ -364,7 +364,7 @@ def validate_manual_placements(job: JobSettings, layout: LayoutResult) -> list[s
 
 - [ ] **Step 4: Uruchom testy — mają przejść**
 
-Run: `cd ~/summa-cut && .venv/bin/pytest tests/test_manual_layout.py -v`
+Run: `cd ~/summa-cut && .venv/bin/python -m pytest tests/test_manual_layout.py -v`
 Expected: PASS (7 testów)
 
 - [ ] **Step 5: Commit**
@@ -426,7 +426,7 @@ def test_build_manual_job_builds_montage_items_from_palette(tmp_path):
 
 - [ ] **Step 2: Uruchom test — ma NIE przejść**
 
-Run: `cd ~/summa-cut && .venv/bin/pytest tests/test_web_job_builder.py::test_build_manual_job_builds_montage_items_from_palette -v`
+Run: `cd ~/summa-cut && .venv/bin/python -m pytest tests/test_web_job_builder.py::test_build_manual_job_builds_montage_items_from_palette -v`
 Expected: FAIL (pydantic: nieznane pola `manual_free_enabled` itd.)
 
 - [ ] **Step 3: Dodaj klasy parametrów manualnych**
@@ -510,12 +510,12 @@ Następnie w `build_job`, na SAMYM POCZĄTKU (przed walidacją `item_w_mm/item_h
 
 - [ ] **Step 6: Uruchom test — ma przejść**
 
-Run: `cd ~/summa-cut && .venv/bin/pytest tests/test_web_job_builder.py::test_build_manual_job_builds_montage_items_from_palette -v`
+Run: `cd ~/summa-cut && .venv/bin/python -m pytest tests/test_web_job_builder.py::test_build_manual_job_builds_montage_items_from_palette -v`
 Expected: PASS
 
 - [ ] **Step 7: Cały plik job_builder (brak regresji)**
 
-Run: `cd ~/summa-cut && .venv/bin/pytest tests/test_web_job_builder.py -q`
+Run: `cd ~/summa-cut && .venv/bin/python -m pytest tests/test_web_job_builder.py -q`
 Expected: PASS
 
 - [ ] **Step 8: Commit**
@@ -592,7 +592,7 @@ def test_manual_generate_blocked_on_overlap(tmp_path):
 
 - [ ] **Step 2: Uruchom testy — mają NIE przejść**
 
-Run: `cd ~/summa-cut && .venv/bin/pytest tests/test_web_api.py -k manual -v`
+Run: `cd ~/summa-cut && .venv/bin/python -m pytest tests/test_web_api.py -k manual -v`
 Expected: FAIL — `/api/job` zwróci 500/400, bo `set_job` woła `compute_layout` na jobie manualnym (brak `item_spec`), a bramki brak.
 
 - [ ] **Step 3: Dodaj helper `_layout_for` i rozgałęzienie**
@@ -672,12 +672,12 @@ W `generate`, zaraz po `job, layout, params = _job_and_layout(session)` a przed 
 
 - [ ] **Step 7: Uruchom testy manualne — mają przejść**
 
-Run: `cd ~/summa-cut && .venv/bin/pytest tests/test_web_api.py -k manual -v`
+Run: `cd ~/summa-cut && .venv/bin/python -m pytest tests/test_web_api.py -k manual -v`
 Expected: PASS (2 testy)
 
 - [ ] **Step 8: Cały pakiet web (brak regresji)**
 
-Run: `cd ~/summa-cut && .venv/bin/pytest tests/test_web_api.py tests/test_web_preview.py -q`
+Run: `cd ~/summa-cut && .venv/bin/python -m pytest tests/test_web_api.py tests/test_web_preview.py -q`
 Expected: PASS
 
 - [ ] **Step 9: Commit**
@@ -710,7 +710,7 @@ W `tests/test_web_frontend.py`, w liście `REQUIRED_IDS`, dopisz na końcu:
 
 - [ ] **Step 2: Uruchom test — ma NIE przejść**
 
-Run: `cd ~/summa-cut && .venv/bin/pytest tests/test_web_frontend.py::test_index_has_required_element_ids -v`
+Run: `cd ~/summa-cut && .venv/bin/python -m pytest tests/test_web_frontend.py::test_index_has_required_element_ids -v`
 Expected: FAIL — `brak id w index.html: ['manual-free', ...]`
 
 - [ ] **Step 3: Dodaj przełącznik trybu**
@@ -738,7 +738,7 @@ W `web/static/index.html`, bezpośrednio po `<fieldset>` „Montaż wielu użytk
 
 - [ ] **Step 5: Uruchom test — ma przejść**
 
-Run: `cd ~/summa-cut && .venv/bin/pytest tests/test_web_frontend.py -v`
+Run: `cd ~/summa-cut && .venv/bin/python -m pytest tests/test_web_frontend.py -v`
 Expected: PASS
 
 - [ ] **Step 6: Commit**
@@ -888,14 +888,14 @@ function renderCanvas() { /* implementacja w Task 8 */ }
 
 Uruchom lokalnie i sprawdź, że przełącznik chowa pola i pokazuje paletę:
 
-Run: `cd ~/summa-cut && .venv/bin/uvicorn web.app:app --port 8899 &`, potem otwórz `http://localhost:8899` (uwaga: `app.py`/`run.sh` to wersja DESKTOP Qt — do weryfikacji web zawsze `web.app:app`).
+Run: `cd ~/summa-cut && .venv/bin/python -m uvicorn web.app:app --port 8899 &`, potem otwórz `http://localhost:8899` (uwaga: `app.py`/`run.sh` to wersja DESKTOP Qt — do weryfikacji web zawsze `web.app:app`).
 Expected: zaznaczenie „tryb manualny" chowa fieldsety źródła/arkusza/montażu, pokazuje panel; po wgraniu 2-str. PDF paleta pokazuje jego nazwę; klik dodaje instancję do `manualState.placements` (sprawdź w konsoli: `manualState.placements.length`).
 
 Zatrzymaj serwer: `kill %1`.
 
 - [ ] **Step 8: Nie psujemy testów Pythona**
 
-Run: `cd ~/summa-cut && .venv/bin/pytest tests/test_web_frontend.py tests/test_web_no_qt.py -q`
+Run: `cd ~/summa-cut && .venv/bin/python -m pytest tests/test_web_frontend.py tests/test_web_no_qt.py -q`
 Expected: PASS
 
 - [ ] **Step 9: Commit**
@@ -1025,7 +1025,7 @@ Podepnij w `wireEvents()`:
 
 - [ ] **Step 4: Weryfikacja w przeglądarce**
 
-Run: `cd ~/summa-cut && .venv/bin/uvicorn web.app:app --port 8899 &`, otwórz `http://localhost:8899`.
+Run: `cd ~/summa-cut && .venv/bin/python -m uvicorn web.app:app --port 8899 &`, otwórz `http://localhost:8899`.
 Expected: po włączeniu trybu i dodaniu 2 instancji widać arkusz, zielony obrys OPOS i prostokąty; przeciąganie działa; nałożone na siebie / wystające prostokąty robią się czerwone; ustawione rozłącznie w obszarze — niebieskie. Zatrzymaj: `kill %1`.
 
 - [ ] **Step 5: Commit**
@@ -1102,7 +1102,7 @@ Podepnij w `wireEvents()`:
 
 - [ ] **Step 2: Weryfikacja w przeglądarce**
 
-Run: `cd ~/summa-cut && .venv/bin/uvicorn web.app:app --port 8899 &`, otwórz stronę.
+Run: `cd ~/summa-cut && .venv/bin/python -m uvicorn web.app:app --port 8899 &`, otwórz stronę.
 Expected: zaznacz instancję → R obraca (prostokąt zmienia proporcje, etykieta pokazuje kąt), D duplikuje z przesunięciem, Delete usuwa, strzałki przesuwają (Shift szybciej). Zatrzymaj: `kill %1`.
 
 - [ ] **Step 3: Commit**
@@ -1160,7 +1160,7 @@ To sprawia, że `applyJob`, podgląd i `doGenerate` w trybie manualnym wysyłaj�
 
 - [ ] **Step 3: Weryfikacja end-to-end w przeglądarce**
 
-Run: `cd ~/summa-cut && .venv/bin/uvicorn web.app:app --port 8899 &`, otwórz stronę.
+Run: `cd ~/summa-cut && .venv/bin/python -m uvicorn web.app:app --port 8899 &`, otwórz stronę.
 Expected:
 1. Wgraj 2-str. PDF, włącz tryb manualny, dodaj 2 rozłączne instancje → „Generuj" tworzy dwa PDF-y; pobierz druk i wykrojnik, otwórz — pozycje zgadzają się z kanwą, wykrojnik ma OPOS.
 2. Nałóż instancje → „Generuj" pokazuje błąd „…nachodzą…" i nie generuje.
@@ -1168,7 +1168,7 @@ Zatrzymaj: `kill %1`.
 
 - [ ] **Step 4: Pełny pakiet testów (regresja całości)**
 
-Run: `cd ~/summa-cut && .venv/bin/pytest -q`
+Run: `cd ~/summa-cut && .venv/bin/python -m pytest -q`
 Expected: PASS (wszystkie ~83 dotychczasowe + nowe z tego planu)
 
 - [ ] **Step 5: Commit**
@@ -1211,7 +1211,7 @@ blokuje generowanie przy nachodzeniu lub wyjściu poza obszar OPOS.
 
 - [ ] **Step 3: Testy frontendu (asset-refs) nadal zielone**
 
-Run: `cd ~/summa-cut && .venv/bin/pytest tests/test_web_frontend.py -q`
+Run: `cd ~/summa-cut && .venv/bin/python -m pytest tests/test_web_frontend.py -q`
 Expected: PASS (test `test_index_references_assets` sprawdza obecność `/static/app.js` i `/static/style.css` — parametr `?v=` nie przeszkadza).
 
 - [ ] **Step 4: Commit**
