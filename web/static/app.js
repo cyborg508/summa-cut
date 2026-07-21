@@ -611,7 +611,26 @@ function optList(names, selected) {
     .join("");
 }
 
+function manualJobBody() {
+  return {
+    print_upload: manualState.items[0] ? manualState.items[0].upload : "",
+    print_page: 0, cut_page: 0,
+    item_w_mm: 0, item_h_mm: 0,
+    sheet_w_mm: parseFloat($("sheet-w").value),
+    sheet_h_mm: parseFloat($("sheet-h").value),
+    opos_side_offset_mm: parseFloat($("opos-side").value),
+    opos_bottom_offset_mm: parseFloat($("opos-bottom").value),
+    opos_top_offset_mm: parseFloat($("opos-top").value),
+    manual_free_enabled: true,
+    manual_items: manualState.items.map((it) => ({ upload: it.upload })),
+    manual_placements: manualState.placements.map((p) => ({
+      item_index: p.itemIndex, x_mm: p.xMm, y_mm: p.yMm, rotation_deg: p.rot,
+    })),
+  };
+}
+
 function collectParams() {
+  if (manualState.enabled) return manualJobBody();
   const gap = document.querySelector("input[name=gapmode]:checked").value === "gap";
   const params = {
     print_upload: $("print-file").value,
