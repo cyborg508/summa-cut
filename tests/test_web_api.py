@@ -289,3 +289,50 @@ def test_special_tile_png_without_prepare_is_400(tmp_path):
     c.post("/api/session")
     r = c.get("/api/special/tile.png")
     assert r.status_code == 400
+
+
+def _two_page_pdf_bytes(w_mm=40.0, h_mm=30.0) -> bytes:
+    doc = fitz.open()
+    doc.new_page(width=w_mm / MM_PER_POINT, height=h_mm / MM_PER_POINT)
+    doc.new_page(width=w_mm / MM_PER_POINT, height=h_mm / MM_PER_POINT)
+    data = doc.tobytes(); doc.close()
+    return data
+
+
+def _manual_job_body(rotation=0, x=20.0, y=50.0, second_x=90.0, second_y=50.0):
+    return {
+        "print_upload": "para.pdf", "item_w_mm": 0, "item_h_mm": 0,
+        "sheet_w_mm": 330, "sheet_h_mm": 480,
+        "opos_side_offset_mm": 10, "opos_bottom_offset_mm": 10, "opos_top_offset_mm": 40,
+        "manual_free_enabled": True,
+        "manual_items": [{"upload": "para.pdf"}],
+        "manual_placements": [
+            {"item_index": 0, "x_mm": x, "y_mm": y, "rotation_deg": rotation},
+            {"item_index": 0, "x_mm": second_x, "y_mm": second_y, "rotation_deg": 0},
+        ],
+    }
+
+
+def test_manual_generate_produces_two_pdfs(tmp_path):
+    c = _client(tmp_path)
+    c.post("/api/session")
+    c.post("/api/upload", files={"file": ("para.pdf", _two_page_pdf_bytes(), "application/pdf")})
+    assert c.post("/api/job", json=_manual_job_body()).status_code == 200
+    r = c.post("/api/generate", json={"base_name": "manual"})
+    assert r.status_code == 200
+    body = r.json()
+    assert body["print_name"].endswith("_druk.pdf")
+    assert body["cut_name"].endswith("_wykrojnik.pdf")
+    assert c.get("/api/download/print").status_code == 200
+    assert c.get("/api/download/cut").status_code == 200
+
+
+def test_manual_generate_blocked_on_overlap(tmp_path):
+    c = _client(tmp_path)
+    c.post("/api/session")
+    c.post("/api/upload", files={"file": ("para.pdf", _two_page_pdf_bytes(), "application/pdf")})
+    body = _manual_job_body(second_x=25.0, second_y=55.0)  # drugi element nachodzi
+    assert c.post("/api/job", json=body).status_code == 200
+    r = c.post("/api/generate", json={"base_name": "manual"})
+    assert r.status_code == 400
+    assert "nachodz" in r.json()["detail"].lower()

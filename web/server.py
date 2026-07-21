@@ -13,6 +13,7 @@ from fastapi.staticfiles import StaticFiles
 
 from summa_cut.export import generate_output_docs, save_output_docs
 from summa_cut.layout import compute_layout
+from summa_cut.manual_layout import ManualPlacement, build_manual_layout, validate_manual_placements
 from summa_cut.special_trim import prepare_special_trim, SPECIAL_PRINT_NAME, SPECIAL_CUT_NAME
 from web.job_builder import JobParams, _require_page, build_job
 from web.preview_render import render_output_png, render_special_tile_png
@@ -112,11 +113,20 @@ def create_app(store: SessionStore) -> FastAPI:
         png = render_special_tile_png(p.path, c.path)
         return RawResponse(content=png, media_type="image/png")
 
+    def _layout_for(job, params: JobParams):
+        if params.manual_free_enabled:
+            mps = [
+                ManualPlacement(mp.item_index, mp.x_mm, mp.y_mm, mp.rotation_deg)
+                for mp in params.manual_placements
+            ]
+            return build_manual_layout(job, mps)
+        return compute_layout(job)
+
     @app.post("/api/job")
     def set_job(params: JobParams, session: Session = Depends(current_session)) -> dict:
         try:
             job = build_job(params, session)
-            layout = compute_layout(job)
+            layout = _layout_for(job, params)
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc))
         session.job_params = params.model_dump()
@@ -132,20 +142,25 @@ def create_app(store: SessionStore) -> FastAPI:
     def _job_and_layout(session: Session):
         if session.job_params is None:
             raise HTTPException(status_code=400, detail="Najpierw ustaw zlecenie (/api/job).")
-        job = build_job(JobParams(**session.job_params), session)
-        return job, compute_layout(job)
+        params = JobParams(**session.job_params)
+        job = build_job(params, session)
+        return job, _layout_for(job, params), params
 
     @app.get("/api/preview/{which}.png")
     def preview(which: str, session: Session = Depends(current_session)) -> RawResponse:
         if which not in ("print", "cut"):
             raise HTTPException(status_code=404, detail="Nieznany podgląd.")
-        job, layout = _job_and_layout(session)
+        job, layout, _params = _job_and_layout(session)
         png = render_output_png(job, layout, which=which)
         return RawResponse(content=png, media_type="image/png")
 
     @app.post("/api/generate")
     def generate(body: GenerateParams, session: Session = Depends(current_session)) -> dict:
-        job, layout = _job_and_layout(session)
+        job, layout, params = _job_and_layout(session)
+        if params.manual_free_enabled:
+            problems = validate_manual_placements(job, layout)
+            if problems:
+                raise HTTPException(status_code=400, detail="; ".join(problems))
         docs = generate_output_docs(job, layout)
         try:
             print_path, cut_path = save_output_docs(docs, session.workdir, base_name=body.base_name)
