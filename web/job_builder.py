@@ -165,6 +165,10 @@ def _build_manual_job(params: JobParams, session: Session) -> JobSettings:
             cut_content_bbox_pt=c_info.page_content_boxes_pt[1],
             quantity=1,
         ))
+    # Pusta paleta jest dozwolona: front może wysłać /api/job z manual_items=[]
+    # przy podglądzie pustej kanwy (sam arkusz + OPOS, 0 użytków) — to nie błąd.
+    # Poniższe placeholdery wypełniają wymagane pola JobSettings, ale eksport
+    # ich nie użyje, bo montage_items jest wtedy pusta (brak placementów).
     base = items[0] if items else None
     empty_page = SelectedPage("", 0)
     zero_bbox = (0.0, 0.0, 0.0, 0.0)
