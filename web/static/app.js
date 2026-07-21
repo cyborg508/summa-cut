@@ -198,6 +198,9 @@ function wireEvents() {
   ed.addEventListener("pointerup", editorPointerUp);
   ed.addEventListener("keydown", editorKey);
   $("controls").addEventListener("input", renderSpecialEditor);
+  $("manual-canvas").addEventListener("pointermove", mcPointerMove);
+  $("manual-canvas").addEventListener("pointerup", mcPointerUp);
+  $("manual-canvas").addEventListener("pointerleave", mcPointerUp);
 }
 
 async function doUpload() {
@@ -454,7 +457,73 @@ function workAreaMm() {
   return { x: side, y: top, w: Math.max(sw - 2 * side, 0), h: Math.max(sh - top - bottom, 0) };
 }
 
-function renderCanvas() { /* implementacja w Task 8 */ }
+const MC_SCALE = 2.2;   // px na mm (podgląd)
+const SVGNS = "http://www.w3.org/2000/svg";
+
+function mcRectBad(p, others, wa) {
+  const outside = p.xMm < wa.x - 0.01 || p.yMm < wa.y - 0.01
+    || p.xMm + p.wMm > wa.x + wa.w + 0.01 || p.yMm + p.hMm > wa.y + wa.h + 0.01;
+  if (outside) return true;
+  return others.some((o) => o !== p
+    && p.xMm < o.xMm + o.wMm - 0.01 && o.xMm < p.xMm + p.wMm - 0.01
+    && p.yMm < o.yMm + o.hMm - 0.01 && o.yMm < p.yMm + p.hMm - 0.01);
+}
+
+function renderCanvas() {
+  const svg = $("manual-canvas");
+  if (!svg) return;
+  svg.innerHTML = "";
+  const sw = parseFloat($("sheet-w").value) || 0;
+  const sh = parseFloat($("sheet-h").value) || 0;
+  svg.setAttribute("width", sw * MC_SCALE);
+  svg.setAttribute("height", sh * MC_SCALE);
+  const add = (tag, attrs, cls) => {
+    const el = document.createElementNS(SVGNS, tag);
+    for (const k in attrs) el.setAttribute(k, attrs[k]);
+    if (cls) el.setAttribute("class", cls);
+    svg.appendChild(el);
+    return el;
+  };
+  add("rect", { x: 0, y: 0, width: sw * MC_SCALE, height: sh * MC_SCALE }, "mc-sheet");
+  const wa = workAreaMm();
+  add("rect", { x: wa.x * MC_SCALE, y: wa.y * MC_SCALE, width: wa.w * MC_SCALE, height: wa.h * MC_SCALE }, "mc-work");
+
+  manualState.placements.forEach((p, i) => {
+    const bad = mcRectBad(p, manualState.placements, wa);
+    let cls = "mc-item";
+    if (i === manualState.selected) cls += " sel";
+    if (bad) cls += " bad";
+    const rect = add("rect", {
+      x: p.xMm * MC_SCALE, y: p.yMm * MC_SCALE,
+      width: p.wMm * MC_SCALE, height: p.hMm * MC_SCALE,
+      "data-idx": i,
+    }, cls);
+    rect.addEventListener("pointerdown", (e) => mcPointerDown(e, i));
+    add("text", { x: (p.xMm + 2) * MC_SCALE, y: (p.yMm + 4) * MC_SCALE }, "mc-label")
+      .textContent = `#${i + 1}${p.rot ? " " + p.rot + "°" : ""}`;
+  });
+}
+
+let mcDrag = null;   // { idx, startX, startY, origX, origY }
+
+function mcPointerDown(e, idx) {
+  e.preventDefault();
+  manualState.selected = idx;
+  const p = manualState.placements[idx];
+  mcDrag = { idx, startX: e.clientX, startY: e.clientY, origX: p.xMm, origY: p.yMm };
+  $("manual-canvas").setPointerCapture?.(e.pointerId);
+  renderCanvas();
+}
+
+function mcPointerMove(e) {
+  if (!mcDrag) return;
+  const p = manualState.placements[mcDrag.idx];
+  p.xMm = Math.round((mcDrag.origX + (e.clientX - mcDrag.startX) / MC_SCALE) * 10) / 10;
+  p.yMm = Math.round((mcDrag.origY + (e.clientY - mcDrag.startY) / MC_SCALE) * 10) / 10;
+  renderCanvas();
+}
+
+function mcPointerUp() { mcDrag = null; }
 
 function addMontageRow() {
   montage.push({ label: "", print_upload: "", print_page: 0, cut_upload: "", cut_page: 0, quantity: 1 });
