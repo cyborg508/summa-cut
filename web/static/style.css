@@ -434,7 +434,7 @@ button:disabled { opacity: .55; cursor: not-allowed; transform: none; }
    szeroka kanwa SVG rozpycha panel poza kolumnę i wchodzi pod panel podglądu. */
 #manual-panel { min-width: 0; }
 .manual-canvas-wrap { overflow: auto; border: 1px solid #ccc; max-height: 70vh; max-width: 100%; }
-#manual-canvas { display: block; background: #fff; }
+#manual-canvas { display: block; background: #fff; width: 100%; height: auto; }
 .mc-item { fill: rgba(40, 90, 200, 0.12); stroke: #285ac8; stroke-width: 1; cursor: move; }
 .mc-item.sel { stroke-width: 2; }
 .mc-item.bad { fill: rgba(210, 40, 40, 0.15); stroke: #d22828; }

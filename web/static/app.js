@@ -477,8 +477,12 @@ function renderCanvas() {
   svg.innerHTML = "";
   const sw = parseFloat($("sheet-w").value) || 0;
   const sh = parseFloat($("sheet-h").value) || 0;
-  svg.setAttribute("width", sw * MC_SCALE);
-  svg.setAttribute("height", sh * MC_SCALE);
+  const W = sw * MC_SCALE, H = sh * MC_SCALE;
+  // viewBox + CSS width:100% → kanwa skaluje się do szerokości kolumny (cały
+  // arkusz widoczny, bez pasków przewijania). Rysujemy nadal w jednostkach MC_SCALE.
+  svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
+  svg.setAttribute("width", W);
+  svg.setAttribute("height", H);
   const add = (tag, attrs, cls) => {
     const el = document.createElementNS(SVGNS, tag);
     for (const k in attrs) el.setAttribute(k, attrs[k]);
@@ -567,8 +571,15 @@ function mcPointerDown(e, idx) {
 function mcPointerMove(e) {
   if (!mcDrag) return;
   const p = manualState.placements[mcDrag.idx];
-  p.xMm = Math.round((mcDrag.origX + (e.clientX - mcDrag.startX) / MC_SCALE) * 10) / 10;
-  p.yMm = Math.round((mcDrag.origY + (e.clientY - mcDrag.startY) / MC_SCALE) * 10) / 10;
+  // Kanwa jest skalowana do szerokości kolumny, więc px ekranu na mm zależy od
+  // realnego rozmiaru SVG — nie od stałej MC_SCALE. Liczymy z bounding rect.
+  const rb = $("manual-canvas").getBoundingClientRect();
+  const sw = parseFloat($("sheet-w").value) || 0;
+  const sh = parseFloat($("sheet-h").value) || 0;
+  const pxPerMmX = (sw && rb.width) ? rb.width / sw : MC_SCALE;
+  const pxPerMmY = (sh && rb.height) ? rb.height / sh : MC_SCALE;
+  p.xMm = Math.round((mcDrag.origX + (e.clientX - mcDrag.startX) / pxPerMmX) * 10) / 10;
+  p.yMm = Math.round((mcDrag.origY + (e.clientY - mcDrag.startY) / pxPerMmY) * 10) / 10;
   renderCanvas();
 }
 
