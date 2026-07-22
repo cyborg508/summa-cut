@@ -437,8 +437,11 @@ button:disabled { opacity: .55; cursor: not-allowed; transform: none; }
 .palette-row label { display: inline-flex; align-items: center; gap: 4px; }
 .palette-row input { width: 68px; }
 .palette-row .pal-add { white-space: nowrap; }
-.manual-canvas-wrap { overflow: auto; border: 1px solid #ccc; max-height: 70vh; max-width: 100%; }
-#manual-canvas { display: block; background: #fff; width: 100%; height: auto; }
+.manual-canvas-wrap { overflow: auto; border: 1px solid #ccc; max-width: 100%; display: flex; justify-content: center; }
+/* SVG ma atrybuty width/height (intrinsic) + viewBox → traktujemy jak obraz:
+   max-width/max-height skalują z zachowaniem proporcji, by zmieścić się i w szerokość,
+   i w wysokość kolumny. getBoundingClientRect zwraca realny box → drag liczy px/mm poprawnie. */
+#manual-canvas { display: block; background: #fff; max-width: 100%; max-height: 74vh; width: auto; height: auto; }
 .mc-item { fill: rgba(40, 90, 200, 0.12); stroke: #285ac8; stroke-width: 1; cursor: move; }
 .mc-item.sel { stroke-width: 2; }
 .mc-item.bad { fill: rgba(210, 40, 40, 0.15); stroke: #d22828; }
