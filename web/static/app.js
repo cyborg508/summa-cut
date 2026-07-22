@@ -416,7 +416,7 @@ function renderPalette() {
   box.innerHTML = "";
   const names = Object.keys(uploads).filter((n) => (uploads[n] || 0) >= 2);
   if (names.length === 0) {
-    box.innerHTML = '<span class="muted">Wgraj PDF 2-stronicowy (str.1 druk, str.2 wykrojnik).</span>';
+    box.innerHTML = '<span class="muted">Brak plików. Wgraj PDF 2-stronicowy (str.1 druk, str.2 wykrojnik) w sekcji „Pliki PDF" u góry — pojawi się tutaj do kliknięcia.</span>';
     return;
   }
   names.forEach((name) => {
