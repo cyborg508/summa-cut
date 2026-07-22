@@ -100,3 +100,22 @@ def test_validate_flags_overlap():
     ])
     problems = validate_manual_placements(job, layout)
     assert problems and any("nachodz" in p.lower() for p in problems)
+
+
+def test_validate_edge_touching_is_not_overlap():
+    # Dwa użytki stykające się DOKŁADNIE krawędzią (x=50) nie nachodzą.
+    # Blokuje regresję kierunku tolerancji _EPS (odwrócenie znaku dałoby fałszywy alarm).
+    job = _job([_item(40, 30, 0), _item(40, 30, 1)])
+    layout = build_manual_layout(job, [
+        ManualPlacement(0, 10.0, 40.0, 0),   # 10..50
+        ManualPlacement(1, 50.0, 40.0, 0),   # 50..90 — styk na x=50
+    ])
+    assert validate_manual_placements(job, layout) == []
+
+
+def test_validate_flush_to_opos_boundary_is_inside():
+    # Użytek dosunięty DOKŁADNIE do prawej/dolnej krawędzi obszaru OPOS
+    # (x=280→320 = sheet_w-side; y=440→470 = sheet_h-bottom) nie jest "poza".
+    job = _job([_item(40, 30, 0)])
+    layout = build_manual_layout(job, [ManualPlacement(0, 280.0, 440.0, 0)])
+    assert validate_manual_placements(job, layout) == []
