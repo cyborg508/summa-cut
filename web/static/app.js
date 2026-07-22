@@ -8,7 +8,8 @@ let previewWhich = "print";  // który obraz pokazuje podgląd: "print" | "cut"
 let rightView = "preview";   // co pokazuje prawy panel: "editor" | "preview"
 // stan trybu specjalnego: po „Przygotuj" trzyma przycięte uploady i rozmiar kafla
 const special = { printUpload: null, cutUpload: null, pageW: 0, pageH: 0, ready: false };
-const manualState = { enabled: false, items: [], placements: [], selected: null };
+const manualState = { enabled: false, items: [], placements: [], selected: null, dims: {} };
+// dims: { [uploadName]: { wMm, hMm } }  — wymiar per plik (kadr footprintu)
 // items: [{ upload }]   placements: [{ itemIndex, xMm, yMm, rot, wMm, hMm }]
 
 // --- Edytor 3×3 trybu specjalnego -------------------------------------------
@@ -410,7 +411,20 @@ function onManualToggle() {
   if (manualState.enabled) { renderPalette(); renderCanvas(); }
 }
 
+function round1(v) { return Math.round((parseFloat(v) || 0) * 10) / 10; }
+
+function ensureDims(name) {
+  if (!manualState.dims[name]) {
+    const info = uploadsInfo[name];
+    const size = info && info.page_sizes_mm && info.page_sizes_mm[0];
+    const w = size ? size[0] : 0, h = size ? size[1] : 0;
+    manualState.dims[name] = { wMm: round1(w), hMm: round1(h) };
+  }
+  return manualState.dims[name];
+}
+
 // Paleta = wgrane PDF-y mające >= 2 strony (str.0=druk, str.1=wykrojnik).
+// Każdy plik = wiersz: nazwa + pola wymiaru (szer./wys. mm) + „Dodaj na arkusz".
 function renderPalette() {
   const box = $("manual-palette");
   box.innerHTML = "";
@@ -420,13 +434,47 @@ function renderPalette() {
     return;
   }
   names.forEach((name) => {
-    const chip = document.createElement("button");
-    chip.type = "button";
-    chip.className = "palette-chip";
-    chip.textContent = name;
-    chip.addEventListener("click", () => addInstance(name));
-    box.appendChild(chip);
+    const d = ensureDims(name);
+    const row = document.createElement("div");
+    row.className = "palette-row";
+    const nameEl = document.createElement("span");
+    nameEl.className = "pal-name";
+    nameEl.textContent = name;
+    nameEl.title = name;
+    const wLab = document.createElement("label");
+    wLab.append("szer. ");
+    const wIn = document.createElement("input");
+    wIn.type = "number"; wIn.step = "0.1"; wIn.min = "0.1"; wIn.className = "pal-w"; wIn.value = d.wMm;
+    wLab.appendChild(wIn);
+    const hLab = document.createElement("label");
+    hLab.append("wys. ");
+    const hIn = document.createElement("input");
+    hIn.type = "number"; hIn.step = "0.1"; hIn.min = "0.1"; hIn.className = "pal-h"; hIn.value = d.hMm;
+    hLab.appendChild(hIn);
+    const addBtn = document.createElement("button");
+    addBtn.type = "button"; addBtn.className = "pal-add"; addBtn.textContent = "Dodaj na arkusz";
+    wIn.addEventListener("input", () => onDimInput(name, wIn.value, hIn.value));
+    hIn.addEventListener("input", () => onDimInput(name, wIn.value, hIn.value));
+    addBtn.addEventListener("click", () => addInstance(name));
+    row.append(nameEl, wLab, hLab, addBtn);
+    box.appendChild(row);
   });
+}
+
+function onDimInput(name, wRaw, hRaw) {
+  const w = round1(wRaw), h = round1(hRaw);
+  if (w <= 0 || h <= 0) return;   // niepełna/nieprawidłowa wartość — czekamy
+  manualState.dims[name] = { wMm: w, hMm: h };
+  const itemIndex = manualState.items.findIndex((it) => it.upload === name);
+  if (itemIndex !== -1) {
+    manualState.placements.forEach((p) => {
+      if (p.itemIndex !== itemIndex) return;
+      if (p.rot === 90 || p.rot === 270) { p.wMm = h; p.hMm = w; }
+      else { p.wMm = w; p.hMm = h; }
+    });
+  }
+  renderCanvas();
+  schedulePreview();
 }
 
 function itemIndexForUpload(name) {
@@ -438,7 +486,8 @@ function itemIndexForUpload(name) {
 function addInstance(name) {
   const info = uploadsInfo[name];
   if (!info) return;
-  const [wMm, hMm] = info.page_sizes_mm[0];
+  const d = ensureDims(name);
+  const wMm = d.wMm, hMm = d.hMm;
   const itemIndex = itemIndexForUpload(name);
   // domyślnie w środku obszaru roboczego OPOS
   const wa = workAreaMm();
