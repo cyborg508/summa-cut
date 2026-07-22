@@ -447,6 +447,7 @@ function addInstance(name) {
   manualState.placements.push({ itemIndex, xMm, yMm, rot: 0, wMm, hMm });
   manualState.selected = manualState.placements.length - 1;
   renderCanvas();
+  schedulePreview();
 }
 
 function workAreaMm() {
@@ -511,6 +512,7 @@ function mcRotateSelected() {
   p.rot = (p.rot + 90) % 360;
   [p.wMm, p.hMm] = [p.hMm, p.wMm];
   renderCanvas();
+  schedulePreview();
 }
 
 function mcDuplicateSelected() {
@@ -519,6 +521,7 @@ function mcDuplicateSelected() {
   manualState.placements.push({ ...p, xMm: Math.round((p.xMm + 5) * 10) / 10, yMm: Math.round((p.yMm + 5) * 10) / 10 });
   manualState.selected = manualState.placements.length - 1;
   renderCanvas();
+  schedulePreview();
 }
 
 function mcDeleteSelected() {
@@ -526,6 +529,7 @@ function mcDeleteSelected() {
   manualState.placements.splice(manualState.selected, 1);
   manualState.selected = null;
   renderCanvas();
+  schedulePreview();
 }
 
 function mcNudge(dx, dy) {
@@ -534,6 +538,7 @@ function mcNudge(dx, dy) {
   p.xMm = Math.round((p.xMm + dx) * 10) / 10;
   p.yMm = Math.round((p.yMm + dy) * 10) / 10;
   renderCanvas();
+  schedulePreview();
 }
 
 function mcKey(e) {
@@ -567,7 +572,7 @@ function mcPointerMove(e) {
   renderCanvas();
 }
 
-function mcPointerUp() { mcDrag = null; }
+function mcPointerUp() { const was = mcDrag; mcDrag = null; if (was) schedulePreview(); }
 
 function addMontageRow() {
   montage.push({ label: "", print_upload: "", print_page: 0, cut_upload: "", cut_page: 0, quantity: 1 });
@@ -715,7 +720,7 @@ function setPreviewWhich(which) {
 
 async function updatePreview() {
   const specialReady = $("special-enable").checked && special.ready;
-  if (!$("print-file").value && !$("montage-enable").checked && !specialReady) return;
+  if (!$("print-file").value && !$("montage-enable").checked && !specialReady && !manualState.enabled) return;
   if (await applyJob()) {
     $("preview-img").src = `/api/preview/${previewWhich}.png?t=${Date.now()}`;
   }
