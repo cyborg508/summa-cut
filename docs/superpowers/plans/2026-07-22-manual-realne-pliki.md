@@ -74,8 +74,7 @@ def render_manual_tile_png(
 
     Kadr identyczny jak w eksporcie (`_render_cell_stamp` / `_centered_clip_rect_pt`),
     więc podgląd = to, co trafi na arkusz. Tylko do wyświetlania — nie dotyka wyjścia."""
-    from summa_cut.export import _centered_clip_rect_pt
-    from summa_cut.pdf_io import mm_to_pt
+    from summa_cut.export import _centered_clip_rect_pt, mm_to_pt
     cell_w_pt = mm_to_pt(width_mm)
     cell_h_pt = mm_to_pt(height_mm)
     with fitz.open(print_path) as pdoc, fitz.open(cut_path) as cdoc:
