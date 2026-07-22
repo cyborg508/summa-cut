@@ -693,7 +693,12 @@ function manualJobBody() {
     opos_bottom_offset_mm: parseFloat($("opos-bottom").value),
     opos_top_offset_mm: parseFloat($("opos-top").value),
     manual_free_enabled: true,
-    manual_items: manualState.items.map((it) => ({ upload: it.upload })),
+    manual_items: manualState.items.map((it) => {
+      const d = manualState.dims[it.upload];
+      return (d && d.wMm > 0 && d.hMm > 0)
+        ? { upload: it.upload, width_mm: d.wMm, height_mm: d.hMm }
+        : { upload: it.upload };
+    }),
     manual_placements: manualState.placements.map((p) => ({
       item_index: p.itemIndex, x_mm: p.xMm, y_mm: p.yMm, rotation_deg: p.rot,
     })),
