@@ -17,6 +17,8 @@ class MontageItemParams(BaseModel):
 
 class ManualItemParams(BaseModel):
     upload: str
+    width_mm: float | None = None
+    height_mm: float | None = None
 
 
 class ManualPlacementParams(BaseModel):
@@ -153,12 +155,16 @@ def _build_manual_job(params: JobParams, session: Session) -> JobSettings:
     for idx, mi in enumerate(params.manual_items):
         p_info = _require_page(session, mi.upload, 0, f"druk palety #{idx + 1}")
         c_info = _require_page(session, mi.upload, 1, f"wykrojnik palety #{idx + 1}")
+        if mi.width_mm and mi.height_mm and mi.width_mm > 0 and mi.height_mm > 0:
+            footprint = (float(mi.width_mm), float(mi.height_mm))
+        else:
+            footprint = p_info.page_sizes_mm[0]
         items.append(MontageItem(
             label=mi.upload,
             print_page=SelectedPage(p_info.path, 0),
             cut_page=SelectedPage(c_info.path, 1),
-            print_page_size_mm=p_info.page_sizes_mm[0],
-            cut_page_size_mm=c_info.page_sizes_mm[1],
+            print_page_size_mm=footprint,
+            cut_page_size_mm=footprint,
             print_content_size_mm=p_info.page_content_sizes_mm[0],
             cut_content_size_mm=c_info.page_content_sizes_mm[1],
             print_content_bbox_pt=p_info.page_content_boxes_pt[0],

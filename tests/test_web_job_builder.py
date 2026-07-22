@@ -294,3 +294,52 @@ def test_build_manual_job_builds_montage_items_from_palette(tmp_path):
     assert item.print_page.page_index == 0
     assert item.cut_page.page_index == 1
     assert item.print_page_size_mm == (40.0, 30.0)
+
+
+def _session_with_para(tmp_path, w_mm=40.0, h_mm=30.0):
+    from summa_cut.pdf_io import MM_PER_POINT, read_pdf_info
+    from web.sessions import SessionStore
+    pt = 1.0 / MM_PER_POINT
+    doc = fitz.open()
+    doc.new_page(width=w_mm * pt, height=h_mm * pt)
+    doc.new_page(width=w_mm * pt, height=h_mm * pt)
+    path = tmp_path / "para.pdf"
+    doc.save(path); doc.close()
+    store = SessionStore(base_dir=tmp_path / "sess")
+    session = store.create()
+    session.uploads["para.pdf"] = read_pdf_info(str(path))
+    return session
+
+
+def _manual_params(items, placements):
+    return JobParams(
+        print_upload="para.pdf", item_w_mm=0, item_h_mm=0,
+        manual_free_enabled=True,
+        manual_items=items,
+        manual_placements=placements,
+        opos_side_offset_mm=10, opos_bottom_offset_mm=10, opos_top_offset_mm=40,
+    )
+
+
+def test_manual_item_dimension_overrides_footprint(tmp_path):
+    from summa_cut.manual_layout import ManualPlacement, build_manual_layout
+    session = _session_with_para(tmp_path)  # PDF 40x30
+    params = _manual_params(
+        items=[{"upload": "para.pdf", "width_mm": 25.0, "height_mm": 18.0}],
+        placements=[{"item_index": 0, "x_mm": 20, "y_mm": 50, "rotation_deg": 0}],
+    )
+    job = build_job(params, session)
+    assert job.montage_items[0].print_page_size_mm == (25.0, 18.0)
+    assert job.montage_items[0].cut_page_size_mm == (25.0, 18.0)
+    layout = build_manual_layout(job, [ManualPlacement(0, 20, 50, 0)])
+    assert (layout.placements[0].width_mm, layout.placements[0].height_mm) == (25.0, 18.0)
+
+
+def test_manual_item_without_dimension_uses_pdf_size(tmp_path):
+    session = _session_with_para(tmp_path)  # PDF 40x30
+    params = _manual_params(
+        items=[{"upload": "para.pdf"}],
+        placements=[{"item_index": 0, "x_mm": 20, "y_mm": 50, "rotation_deg": 0}],
+    )
+    job = build_job(params, session)
+    assert job.montage_items[0].print_page_size_mm == (40.0, 30.0)
