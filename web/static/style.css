@@ -428,11 +428,15 @@ button:disabled { opacity: .55; cursor: not-allowed; transform: none; }
 }
 
 /* ---------- Tryb manualny: paleta + kanwa ---------- */
-.palette { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0; }
-.palette-chip { padding: 4px 8px; border: 1px solid #888; border-radius: 4px; cursor: pointer; background: #f4f4f4; }
-/* Fieldsety nie kurczą się poniżej szerokości treści bez min-width:0 — bez tego
-   szeroka kanwa SVG rozpycha panel poza kolumnę i wchodzi pod panel podglądu. */
-#manual-panel { min-width: 0; }
+#manual-stage { display: flex; flex-direction: column; gap: 10px; }
+.palette { display: flex; flex-direction: column; gap: 6px; margin: 6px 0; }
+.palette-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  padding: 6px 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); }
+.palette-row .pal-name { font-weight: 600; flex: 1 1 140px; min-width: 0;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.palette-row label { display: inline-flex; align-items: center; gap: 4px; }
+.palette-row input { width: 68px; }
+.palette-row .pal-add { white-space: nowrap; }
 .manual-canvas-wrap { overflow: auto; border: 1px solid #ccc; max-height: 70vh; max-width: 100%; }
 #manual-canvas { display: block; background: #fff; width: 100%; height: auto; }
 .mc-item { fill: rgba(40, 90, 200, 0.12); stroke: #285ac8; stroke-width: 1; cursor: move; }

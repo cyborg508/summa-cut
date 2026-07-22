@@ -33,7 +33,7 @@ REQUIRED_IDS = [
     "montage-enable", "montage-rows", "montage-add",
     "generate-btn", "summary", "error",
     "preview-img", "preview-print-btn", "preview-cut-btn",
-    "manual-free", "manual-panel", "manual-palette", "manual-canvas",
+    "manual-free", "manual-stage", "manual-palette", "manual-canvas",
     "manual-hint",
 ]
 

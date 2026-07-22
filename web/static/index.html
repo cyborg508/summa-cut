@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>summa-cut web</title>
-  <link rel="stylesheet" href="/static/style.css?v=3">
+  <link rel="stylesheet" href="/static/style.css?v=4">
 </head>
 <body>
   <header><h1>summa-cut <span class="muted">— impozytor druk + wykrojnik</span></h1></header>
@@ -65,15 +65,6 @@
         <button type="button" id="montage-add">+ dodaj użytek</button>
       </fieldset>
 
-      <fieldset id="manual-panel" style="display:none">
-        <legend>Tryb manualny</legend>
-        <p id="manual-hint" class="muted">Kliknij użytek w palecie, aby dodać go na arkusz. Przeciągaj myszą; strzałki = przesuw, R = obrót 90°, D = duplikuj, Delete = usuń.</p>
-        <div id="manual-palette" class="palette"></div>
-        <div class="manual-canvas-wrap">
-          <svg id="manual-canvas" xmlns="http://www.w3.org/2000/svg"></svg>
-        </div>
-      </fieldset>
-
       <fieldset class="special">
         <legend>Tryb specjalny (wektorowy obrys + spad)</legend>
         <label><input type="checkbox" id="special-enable"> włącz tryb specjalny</label>
@@ -97,6 +88,14 @@
       <div class="segmented" id="view-switch" hidden>
         <button type="button" id="view-editor-btn" class="seg-btn active">Edytor 3×3</button>
         <button type="button" id="view-preview-btn" class="seg-btn">Podgląd</button>
+      </div>
+
+      <div id="manual-stage" hidden>
+        <p id="manual-hint" class="muted">Kliknij „Dodaj na arkusz" przy pliku, aby umieścić go na arkuszu. Przeciągaj myszą; strzałki = przesuw, R = obrót 90°, D = duplikuj, Delete = usuń.</p>
+        <div id="manual-palette" class="palette"></div>
+        <div class="manual-canvas-wrap">
+          <svg id="manual-canvas" xmlns="http://www.w3.org/2000/svg"></svg>
+        </div>
       </div>
 
       <div id="view-editor" hidden>
@@ -128,6 +127,6 @@
       </div>
     </section>
   </main>
-  <script src="/static/app.js?v=3"></script>
+  <script src="/static/app.js?v=4"></script>
 </body>
 </html>

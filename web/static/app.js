@@ -401,14 +401,20 @@ function autoLayoutFieldsets() {
 }
 
 function onManualToggle() {
-  manualState.enabled = $("manual-free").checked;
-  $("manual-panel").style.display = manualState.enabled ? "" : "none";
+  const on = $("manual-free").checked;
+  manualState.enabled = on;
+  // Prawy panel: w trybie manualnym pokazujemy przestrzeń montażu (paleta+kanwa),
+  // chowamy podgląd PNG/edytor 3×3.
+  $("manual-stage").hidden = !on;
+  $("view-preview").hidden = on;
+  $("view-editor").hidden = $("view-editor").hidden || on;
+  $("view-switch").hidden = on ? true : !$("special-enable").checked;
+  // Lewa kolumna: chowamy fieldsety auto-układu (zostaje „Tryb" z przełącznikiem).
   for (const fs of autoLayoutFieldsets()) {
-    // „Tryb" zostawiamy widoczny (jest w nim przełącznik manualny); reszta znika.
     const isModeFs = fs.querySelector("legend").textContent.trim() === "Tryb";
-    if (!isModeFs) fs.style.display = manualState.enabled ? "none" : "";
+    if (!isModeFs) fs.style.display = on ? "none" : "";
   }
-  if (manualState.enabled) { renderPalette(); renderCanvas(); }
+  if (on) { renderPalette(); renderCanvas(); }
 }
 
 function round1(v) { return Math.round((parseFloat(v) || 0) * 10) / 10; }
