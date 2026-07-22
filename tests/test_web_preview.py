@@ -59,3 +59,26 @@ def test_render_special_tile_png_nonzero(tmp_path):
     png = render_special_tile_png(str(pp), str(cp), max_px=200)
     assert isinstance(png, bytes) and len(png) > 100
     assert png[:8] == b"\x89PNG\r\n\x1a\n"
+
+
+def _two_page_para(tmp_path, w_mm=40.0, h_mm=30.0):
+    doc = fitz.open()
+    doc.new_page(width=w_mm * PT, height=h_mm * PT).draw_rect(
+        fitz.Rect(2 * PT, 2 * PT, (w_mm - 2) * PT, (h_mm - 2) * PT), color=(0, 0, 1))
+    doc.new_page(width=w_mm * PT, height=h_mm * PT).draw_rect(
+        fitz.Rect(1 * PT, 1 * PT, (w_mm - 1) * PT, (h_mm - 1) * PT), color=(1, 0, 0))
+    path = tmp_path / "para.pdf"
+    doc.save(path); doc.close()
+    return str(path)
+
+
+def test_render_manual_tile_png_returns_png_with_aspect(tmp_path):
+    import io
+    from web.preview_render import render_manual_tile_png
+    path = _two_page_para(tmp_path)  # 40x30
+    bbox0 = (0.0, 0.0, 40 * PT, 30 * PT)
+    bbox1 = (0.0, 0.0, 40 * PT, 30 * PT)
+    png = render_manual_tile_png(path, 0, bbox0, path, 1, bbox1, 40.0, 30.0, 0, max_px=200)
+    assert png[:8] == b"\x89PNG\r\n\x1a\n"
+    pix = fitz.Pixmap(io.BytesIO(png))
+    assert pix.width == 200 and 140 <= pix.height <= 160

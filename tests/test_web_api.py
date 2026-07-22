@@ -336,3 +336,21 @@ def test_manual_generate_blocked_on_overlap(tmp_path):
     r = c.post("/api/generate", json={"base_name": "manual"})
     assert r.status_code == 400
     assert "nachodz" in r.json()["detail"].lower()
+
+
+def test_manual_tile_endpoint_returns_png(tmp_path):
+    c = _client(tmp_path)
+    c.post("/api/session")
+    c.post("/api/upload", files={"file": ("para.pdf", _two_page_pdf_bytes(), "application/pdf")})
+    r = c.get("/api/manual/tile.png", params={"upload": "para.pdf", "w": 40, "h": 30, "rot": 0})
+    assert r.status_code == 200
+    assert r.headers["content-type"] == "image/png"
+    assert r.content[:8] == b"\x89PNG\r\n\x1a\n"
+
+
+def test_manual_tile_endpoint_errors(tmp_path):
+    c = _client(tmp_path)
+    c.post("/api/session")
+    c.post("/api/upload", files={"file": ("para.pdf", _two_page_pdf_bytes(), "application/pdf")})
+    assert c.get("/api/manual/tile.png", params={"upload": "brak.pdf", "w": 40, "h": 30}).status_code == 404
+    assert c.get("/api/manual/tile.png", params={"upload": "para.pdf", "w": 0, "h": 30}).status_code == 400

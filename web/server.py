@@ -16,7 +16,7 @@ from summa_cut.layout import compute_layout
 from summa_cut.manual_layout import ManualPlacement, build_manual_layout, validate_manual_placements
 from summa_cut.special_trim import prepare_special_trim, SPECIAL_PRINT_NAME, SPECIAL_CUT_NAME
 from web.job_builder import JobParams, _require_page, build_job
-from web.preview_render import render_output_png, render_special_tile_png
+from web.preview_render import render_manual_tile_png, render_output_png, render_special_tile_png
 from web.sessions import Session, SessionStore
 
 
@@ -111,6 +111,23 @@ def create_app(store: SessionStore) -> FastAPI:
         if p is None or c is None:
             raise HTTPException(status_code=400, detail="Najpierw przygotuj wykrojnik (/api/special/prepare).")
         png = render_special_tile_png(p.path, c.path)
+        return RawResponse(content=png, media_type="image/png")
+
+    @app.get("/api/manual/tile.png")
+    def manual_tile(upload: str, w: float, h: float, rot: int = 0,
+                    session: Session = Depends(current_session)) -> RawResponse:
+        info = session.uploads.get(upload)
+        if info is None:
+            raise HTTPException(status_code=404, detail="Nieznany plik.")
+        if len(info.page_content_boxes_pt) < 2:
+            raise HTTPException(status_code=400, detail="Plik musi mieć 2 strony: druk + wykrojnik.")
+        if w <= 0 or h <= 0:
+            raise HTTPException(status_code=400, detail="Wymiar musi być większy od zera.")
+        png = render_manual_tile_png(
+            info.path, 0, info.page_content_boxes_pt[0],
+            info.path, 1, info.page_content_boxes_pt[1],
+            w, h, rot,
+        )
         return RawResponse(content=png, media_type="image/png")
 
     def _layout_for(job, params: JobParams):
