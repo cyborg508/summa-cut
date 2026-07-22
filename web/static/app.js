@@ -551,6 +551,18 @@ function renderCanvas() {
 
   manualState.placements.forEach((p, i) => {
     const bad = mcRectBad(p, manualState.placements, wa);
+    // Realny plik pod obwódką: kafel druk+wykrojnik (kadr W×H, jak eksport).
+    const name = manualState.items[p.itemIndex] ? manualState.items[p.itemIndex].upload : "";
+    if (name) {
+      const href = `/api/manual/tile.png?upload=${encodeURIComponent(name)}&w=${p.wMm}&h=${p.hMm}&rot=${p.rot}`;
+      add("image", {
+        href,
+        x: p.xMm * MC_SCALE, y: p.yMm * MC_SCALE,
+        width: p.wMm * MC_SCALE, height: p.hMm * MC_SCALE,
+        preserveAspectRatio: "none",
+        "pointer-events": "none",
+      });
+    }
     let cls = "mc-item";
     if (i === manualState.selected) cls += " sel";
     if (bad) cls += " bad";

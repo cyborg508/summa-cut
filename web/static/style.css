@@ -442,7 +442,7 @@ button:disabled { opacity: .55; cursor: not-allowed; transform: none; }
    max-width/max-height skalują z zachowaniem proporcji, by zmieścić się i w szerokość,
    i w wysokość kolumny. getBoundingClientRect zwraca realny box → drag liczy px/mm poprawnie. */
 #manual-canvas { display: block; background: #fff; max-width: 100%; max-height: 74vh; width: auto; height: auto; }
-.mc-item { fill: rgba(40, 90, 200, 0.12); stroke: #285ac8; stroke-width: 1; cursor: move; }
+.mc-item { fill: transparent; stroke: #285ac8; stroke-width: 1; cursor: move; }
 .mc-item.sel { stroke-width: 2; }
 .mc-item.bad { fill: rgba(210, 40, 40, 0.15); stroke: #d22828; }
 .mc-work { fill: none; stroke: #2a2; stroke-dasharray: 4 3; }
