@@ -202,3 +202,12 @@ Przy powrocie do projektu zacząć od:
 - przeczytania `summa-cut/STATUS.md`
 - potem `summa-cut/SPEC.md`
 - a następnie wrócić do `SPEC.md` i kontynuować od nowej, doprecyzowanej opcji
+
+## Tryb manualny (2026-07-22)
+
+Impozycja ręczna w stylu PlaceIt: paleta wgranych PDF-ów 2-stronicowych
+(str.1 druk, str.2 wykrojnik), kanwa SVG z przeciąganiem, obrotem 90°,
+duplikacją i usuwaniem, czerwoną obwódką przy nachodzeniu/wyjściu poza OPOS.
+Wyjście: dwa PDF-y (druk + wykrojnik z OPOS), przez istniejący eksport
+(`build_manual_layout` → `generate_output_docs`). Bramka `/api/generate`
+blokuje generowanie przy nachodzeniu lub wyjściu poza obszar OPOS.
