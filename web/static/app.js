@@ -426,11 +426,13 @@ const DIE_MARGIN_MM = 3;
 function ensureDims(name) {
   if (!manualState.dims[name]) {
     const info = uploadsInfo[name];
-    // Prostokąt konturu WYKROJNIKA (strona 1). Fallback: rozmiar strony druku.
+    // Prostokąt WEKTOROWEGO obrysu WYKROJNIKA (jak w trybie specjalnym) — węższy niż
+    // generyczny content bbox. Fallback: content bbox str.1, potem rozmiar strony druku.
+    const outline = info && info.cut_outline_size_mm;
     const cut = info && info.page_content_sizes_mm && info.page_content_sizes_mm[1];
-    const base = (cut && cut[0] > 0 && cut[1] > 0)
-      ? cut
-      : ((info && info.page_sizes_mm && info.page_sizes_mm[0]) || [0, 0]);
+    const base = (outline && outline[0] > 0 && outline[1] > 0) ? outline
+      : ((cut && cut[0] > 0 && cut[1] > 0) ? cut
+        : ((info && info.page_sizes_mm && info.page_sizes_mm[0]) || [0, 0]));
     manualState.dims[name] = {
       wMm: roundMm(base[0] + DIE_MARGIN_MM),
       hMm: roundMm(base[1] + DIE_MARGIN_MM),

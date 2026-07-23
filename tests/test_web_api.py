@@ -354,3 +354,21 @@ def test_manual_tile_endpoint_errors(tmp_path):
     c.post("/api/upload", files={"file": ("para.pdf", _two_page_pdf_bytes(), "application/pdf")})
     assert c.get("/api/manual/tile.png", params={"upload": "brak.pdf", "w": 40, "h": 30}).status_code == 404
     assert c.get("/api/manual/tile.png", params={"upload": "para.pdf", "w": 0, "h": 30}).status_code == 400
+
+
+def test_upload_returns_cut_outline_size(tmp_path):
+    import fitz
+    from summa_cut.pdf_io import MM_PER_POINT
+    PT = 1.0 / MM_PER_POINT
+    doc = fitz.open()
+    doc.new_page(width=40 * PT, height=30 * PT)
+    doc.new_page(width=40 * PT, height=30 * PT).draw_rect(
+        fitz.Rect(1.5 * PT, 1.5 * PT, 38.5 * PT, 28.5 * PT), color=(0, 0, 0), width=2)
+    data = doc.tobytes(); doc.close()
+    c = _client(tmp_path)
+    c.post("/api/session")
+    r = c.post("/api/upload", files={"file": ("para.pdf", data, "application/pdf")})
+    body = r.json()
+    assert body["cut_outline_size_mm"] is not None
+    w, h = body["cut_outline_size_mm"]
+    assert abs(w - 37.0) < 0.3 and abs(h - 27.0) < 0.3

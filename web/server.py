@@ -14,7 +14,7 @@ from fastapi.staticfiles import StaticFiles
 from summa_cut.export import generate_output_docs, save_output_docs
 from summa_cut.layout import compute_layout
 from summa_cut.manual_layout import ManualPlacement, build_manual_layout, validate_manual_placements
-from summa_cut.special_trim import prepare_special_trim, SPECIAL_PRINT_NAME, SPECIAL_CUT_NAME
+from summa_cut.special_trim import cut_outline_size_mm, prepare_special_trim, SPECIAL_PRINT_NAME, SPECIAL_CUT_NAME
 from web.job_builder import JobParams, _require_page, build_job
 from web.preview_render import render_manual_tile_png, render_output_png, render_special_tile_png
 from web.sessions import Session, SessionStore
@@ -74,11 +74,15 @@ def create_app(store: SessionStore) -> FastAPI:
             info = store.save_upload(session, file.filename or "plik.pdf", data)
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc))
+        # Rozmiar wektorowego obrysu wykrojnika (str.1) — jak w trybie specjalnym,
+        # węższy niż generyczny content bbox. Domyślny wymiar użytku w trybie manualnym.
+        cut_outline = cut_outline_size_mm(info.path, 1) if info.page_count >= 2 else None
         return {
             "name": info.name,
             "page_count": info.page_count,
             "page_sizes_mm": info.page_sizes_mm,
             "page_content_sizes_mm": info.page_content_sizes_mm,
+            "cut_outline_size_mm": cut_outline,
         }
 
     @app.post("/api/special/prepare")

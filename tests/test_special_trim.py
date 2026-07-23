@@ -209,3 +209,25 @@ def test_parity_with_desktop_prepare(tmp_path: Path):
     w = min(a.shape[1], b.shape[1])
     diff = np.abs(a[:h, :w].astype(float) - b[:h, :w].astype(float))
     assert diff.mean() < 6.0, f"średnia różnica pikseli {diff.mean():.2f} za duża"
+
+
+def test_cut_outline_size_mm_matches_contour(tmp_path):
+    from summa_cut.special_trim import cut_outline_size_mm
+    PT = 1.0 / MM_PER_POINT
+    doc = fitz.open()
+    doc.new_page(width=40 * PT, height=30 * PT)  # str.0 druk (bez obrysu wektorowego)
+    doc.new_page(width=40 * PT, height=30 * PT).draw_rect(
+        fitz.Rect(1.5 * PT, 1.5 * PT, 38.5 * PT, 28.5 * PT), color=(0, 0, 0), width=2)  # str.1 kontur 37x27
+    path = tmp_path / "para.pdf"
+    doc.save(path); doc.close()
+    w, h = cut_outline_size_mm(str(path), 1)
+    assert abs(w - 37.0) < 0.2 and abs(h - 27.0) < 0.2
+
+
+def test_cut_outline_size_mm_none_when_no_outline(tmp_path):
+    from summa_cut.special_trim import cut_outline_size_mm
+    PT = 1.0 / MM_PER_POINT
+    doc = fitz.open(); doc.new_page(width=40 * PT, height=30 * PT)  # pusta strona, brak obrysu
+    path = tmp_path / "blank.pdf"; doc.save(path); doc.close()
+    assert cut_outline_size_mm(str(path), 0) is None
+    assert cut_outline_size_mm(str(path), 9) is None

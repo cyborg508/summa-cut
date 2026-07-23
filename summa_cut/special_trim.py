@@ -224,3 +224,26 @@ def prepare_special_trim(
     finally:
         print_doc.close()
         cut_doc.close()
+
+
+def cut_outline_size_mm(cut_pdf_path: str, cut_page: int) -> tuple[float, float] | None:
+    """Rozmiar (mm) bounding-boxa WEKTOROWEGO obrysu wykrojnika — ta sama detekcja
+    co tryb specjalny (`extract_cut_outline`), dużo węższa niż generyczny content bbox.
+
+    Zwraca None, gdy pliku nie da się otworzyć, strona nie istnieje albo nie ma
+    prawidłowego obrysu wektorowego."""
+    try:
+        doc = fitz.open(cut_pdf_path)
+    except Exception:
+        return None
+    try:
+        if cut_page < 0 or cut_page >= doc.page_count:
+            return None
+        try:
+            geom = extract_cut_outline(doc[cut_page])
+        except ValueError:
+            return None
+        minx, miny, maxx, maxy = geom.bounds
+        return ((maxx - minx) * MM_PER_POINT, (maxy - miny) * MM_PER_POINT)
+    finally:
+        doc.close()
