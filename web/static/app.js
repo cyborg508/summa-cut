@@ -417,14 +417,24 @@ function onManualToggle() {
   if (on) { renderPalette(); renderCanvas(); }
 }
 
-function round1(v) { return Math.round((parseFloat(v) || 0) * 10) / 10; }
+function roundMm(v) { return Math.round(parseFloat(v) || 0); }
+
+// Margines domyślny: kontur wykrojnika zamknięty w prostokąt + 3mm ŁĄCZNIE na wymiar
+// (czyli 1,5mm z każdej strony). Wymiary zaokrąglane do pełnych mm.
+const DIE_MARGIN_MM = 3;
 
 function ensureDims(name) {
   if (!manualState.dims[name]) {
     const info = uploadsInfo[name];
-    const size = info && info.page_sizes_mm && info.page_sizes_mm[0];
-    const w = size ? size[0] : 0, h = size ? size[1] : 0;
-    manualState.dims[name] = { wMm: round1(w), hMm: round1(h) };
+    // Prostokąt konturu WYKROJNIKA (strona 1). Fallback: rozmiar strony druku.
+    const cut = info && info.page_content_sizes_mm && info.page_content_sizes_mm[1];
+    const base = (cut && cut[0] > 0 && cut[1] > 0)
+      ? cut
+      : ((info && info.page_sizes_mm && info.page_sizes_mm[0]) || [0, 0]);
+    manualState.dims[name] = {
+      wMm: roundMm(base[0] + DIE_MARGIN_MM),
+      hMm: roundMm(base[1] + DIE_MARGIN_MM),
+    };
   }
   return manualState.dims[name];
 }
@@ -450,12 +460,12 @@ function renderPalette() {
     const wLab = document.createElement("label");
     wLab.append("szer. ");
     const wIn = document.createElement("input");
-    wIn.type = "number"; wIn.step = "0.1"; wIn.min = "0.1"; wIn.className = "pal-w"; wIn.value = d.wMm;
+    wIn.type = "number"; wIn.step = "1"; wIn.min = "1"; wIn.className = "pal-w"; wIn.value = d.wMm;
     wLab.appendChild(wIn);
     const hLab = document.createElement("label");
     hLab.append("wys. ");
     const hIn = document.createElement("input");
-    hIn.type = "number"; hIn.step = "0.1"; hIn.min = "0.1"; hIn.className = "pal-h"; hIn.value = d.hMm;
+    hIn.type = "number"; hIn.step = "1"; hIn.min = "1"; hIn.className = "pal-h"; hIn.value = d.hMm;
     hLab.appendChild(hIn);
     const addBtn = document.createElement("button");
     addBtn.type = "button"; addBtn.className = "pal-add"; addBtn.textContent = "Dodaj na arkusz";
@@ -468,7 +478,7 @@ function renderPalette() {
 }
 
 function onDimInput(name, wRaw, hRaw) {
-  const w = round1(wRaw), h = round1(hRaw);
+  const w = roundMm(wRaw), h = roundMm(hRaw);
   if (w <= 0 || h <= 0) return;   // niepełna/nieprawidłowa wartość — czekamy
   manualState.dims[name] = { wMm: w, hMm: h };
   const itemIndex = manualState.items.findIndex((it) => it.upload === name);
