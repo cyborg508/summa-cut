@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>summa-cut web</title>
-  <link rel="stylesheet" href="/static/style.css?v=7">
+  <link rel="stylesheet" href="/static/style.css?v=8">
 </head>
 <body>
   <header><h1>summa-cut <span class="muted">— impozytor druk + wykrojnik</span></h1></header>
@@ -15,6 +15,7 @@
         <input type="file" id="upload-input" accept="application/pdf" multiple>
         <button type="button" id="upload-btn">Wgraj</button>
         <ul id="uploads-list" class="uploads"></ul>
+        <div id="manual-palette" class="palette" hidden></div>
       </fieldset>
 
       <fieldset>
@@ -91,8 +92,7 @@
       </div>
 
       <div id="manual-stage" hidden>
-        <p id="manual-hint" class="muted">Kliknij „Dodaj na arkusz" przy pliku, aby umieścić go na arkuszu. Przeciągaj myszą; strzałki = przesuw, R = obrót 90°, D = duplikuj, Delete = usuń.</p>
-        <div id="manual-palette" class="palette"></div>
+        <p id="manual-hint" class="muted">Ustaw wymiar i kliknij „Dodaj na arkusz" przy pliku (lista pod „Wgraj"). Przeciągaj myszą; strzałki = przesuw, R = obrót 90°, D = duplikuj, Delete = usuń.</p>
         <div class="manual-canvas-wrap">
           <svg id="manual-canvas" xmlns="http://www.w3.org/2000/svg"></svg>
         </div>
@@ -127,6 +127,6 @@
       </div>
     </section>
   </main>
-  <script src="/static/app.js?v=7"></script>
+  <script src="/static/app.js?v=8"></script>
 </body>
 </html>

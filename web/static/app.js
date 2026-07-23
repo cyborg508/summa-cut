@@ -406,6 +406,10 @@ function onManualToggle() {
   // Prawy panel: w trybie manualnym pokazujemy przestrzeń montażu (paleta+kanwa),
   // chowamy podgląd PNG/edytor 3×3.
   $("manual-stage").hidden = !on;
+  // Lista plików pod „Wgraj": w trybie manualnym prosty <ul> ustępuje bogatej palecie
+  // (nazwa + wymiar + „Dodaj na arkusz") — jedna lista, bez dublowania po prawej.
+  $("uploads-list").hidden = on;
+  $("manual-palette").hidden = !on;
   $("view-preview").hidden = on;
   $("view-editor").hidden = $("view-editor").hidden || on;
   $("view-switch").hidden = on ? true : !$("special-enable").checked;
