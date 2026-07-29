@@ -55,17 +55,20 @@ def render_manual_tile_png(
 
     Kadr identyczny jak w eksporcie (`_render_cell_stamp` / `_centered_clip_rect_pt`),
     więc podgląd = to, co trafi na arkusz. Tylko do wyświetlania — nie dotyka wyjścia."""
-    from summa_cut.export import _centered_clip_rect_pt, mm_to_pt
+    from summa_cut.export import _centered_clip_rect_pt, _fit_target_rect, mm_to_pt
     cell_w_pt = mm_to_pt(width_mm)
     cell_h_pt = mm_to_pt(height_mm)
     with fitz.open(print_path) as pdoc, fitz.open(cut_path) as cdoc:
         p_clip = _centered_clip_rect_pt(pdoc[print_page].rect, tuple(print_bbox_pt), width_mm, height_mm, rotation_deg)
         c_clip = _centered_clip_rect_pt(cdoc[cut_page].rect, tuple(cut_bbox_pt), width_mm, height_mm, rotation_deg)
+        # Cel 1:1 wyśrodkowany w kaflu — spójnie z eksportem, bez rozciągania źródła.
+        p_target = _fit_target_rect(p_clip, cell_w_pt, cell_h_pt, rotation_deg)
+        c_target = _fit_target_rect(c_clip, cell_w_pt, cell_h_pt, rotation_deg)
         out = fitz.open()
         try:
             page = out.new_page(width=cell_w_pt, height=cell_h_pt)
-            page.show_pdf_page(page.rect, pdoc, print_page, rotate=rotation_deg, clip=p_clip)
-            page.show_pdf_page(page.rect, cdoc, cut_page, rotate=rotation_deg, clip=c_clip)
+            page.show_pdf_page(p_target, pdoc, print_page, rotate=rotation_deg, clip=p_clip)
+            page.show_pdf_page(c_target, cdoc, cut_page, rotate=rotation_deg, clip=c_clip)
             scale = max_px / max(cell_w_pt, cell_h_pt, 1.0)
             pix = page.get_pixmap(matrix=fitz.Matrix(scale, scale), alpha=False)
             return pix.tobytes("png")

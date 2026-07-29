@@ -172,3 +172,40 @@ def test_centered_clip_swaps_dims_for_270():
     assert round(r270.height, 3) == round(r90.height, 3)
     assert round(r270.width, 1) == round(mm_to_pt(10.0), 1)
     assert round(r270.height, 1) == round(mm_to_pt(30.0), 1)
+
+
+def _stamp_content_size_mm(stamp_bytes: bytes) -> tuple[float, float]:
+    """Rozmiar (mm) bboxa narysowanej treści w gotowym stemplu."""
+    from summa_cut.export import mm_to_pt
+    doc = fitz.open("pdf", stamp_bytes)
+    page = doc[0]
+    rects = [fitz.Rect(b) for _k, b in page.get_bboxlog() if fitz.Rect(b).width > 0 and fitz.Rect(b).height > 0]
+    content = fitz.Rect(rects[0])
+    for r in rects[1:]:
+        content |= r
+    content &= page.rect
+    unit = mm_to_pt(1.0)
+    return content.width / unit, content.height / unit
+
+
+def test_stamp_does_not_stretch_source_when_cell_larger_than_page():
+    """Kafel większy od strony źródła NIE może rozciągać druku.
+
+    Regresja: w trybie manualnym footprint = rozmiar_druku + 3mm marginesu
+    (DIE_MARGIN), więc kafel 46x46 dla strony 40x40 rozdmuchiwał druk zamiast
+    zostawić margines. Druk ma lądować 1:1, wyśrodkowany."""
+    from summa_cut.export import _render_cell_stamp, mm_to_pt
+    side = mm_to_pt(40)
+    src = fitz.open()
+    page = src.new_page(width=side, height=side)
+    # obrys tuż przy krawędzi → content bbox ≈ pełna strona 40x40 mm
+    page.draw_rect(fitz.Rect(1, 1, side - 1, side - 1), color=(0, 0, 1), width=1.0)
+    content_bbox = (0.0, 0.0, side, side)
+
+    # kafel 46x46 mm (strona 40 + 3mm marginesu z każdej strony)
+    stamp = _render_cell_stamp(src, 0, content_bbox, 46.0, 46.0, 0, False)
+    w_mm, h_mm = _stamp_content_size_mm(stamp)
+
+    # druk ma zostać w skali 1:1 (~40mm), NIE rozdmuchany do ~46mm
+    assert w_mm == pytest.approx(40.0, abs=1.5), f"druk rozciągnięty w poziomie: {w_mm:.2f} mm"
+    assert h_mm == pytest.approx(40.0, abs=1.5), f"druk rozciągnięty w pionie: {h_mm:.2f} mm"

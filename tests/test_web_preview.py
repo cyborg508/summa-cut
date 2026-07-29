@@ -82,3 +82,24 @@ def test_render_manual_tile_png_returns_png_with_aspect(tmp_path):
     assert png[:8] == b"\x89PNG\r\n\x1a\n"
     pix = fitz.Pixmap(io.BytesIO(png))
     assert pix.width == 200 and 140 <= pix.height <= 160
+
+
+def test_manual_tile_preview_does_not_stretch_when_cell_larger_than_page(tmp_path):
+    """Podgląd kafla NIE może rozciągać druku: gdy kafel > strona źródła, dookoła
+    treści ma zostać margines (tło), a nie rozdmuchanie do całego kafla."""
+    from web.preview_render import render_manual_tile_png
+    from summa_cut.export import mm_to_pt
+    side = mm_to_pt(40)
+    doc = fitz.open()
+    page = doc.new_page(width=side, height=side)
+    page.draw_rect(fitz.Rect(0, 0, side, side), color=(0, 0, 1), fill=(0, 0, 1))
+    p = tmp_path / "tile_src.pdf"
+    doc.save(p); doc.close()
+    bbox = (0.0, 0.0, side, side)
+
+    # kafel 46x46 mm (strona 40 + 3mm marginesu z każdej strony)
+    png = render_manual_tile_png(str(p), 0, bbox, str(p), 0, bbox, 46.0, 46.0, 0)
+
+    pix = fitz.Pixmap(png)
+    r, g, b = pix.pixel(2, 2)[:3]  # róg — margines = tło (białe), rozciągnięcie = niebieskie
+    assert r > 200 and g > 200 and b > 200, f"brak marginesu = druk rozciągnięty (róg RGB={r},{g},{b})"

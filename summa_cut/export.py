@@ -64,6 +64,21 @@ def _centered_clip_rect_pt(
     return fitz.Rect(x0, y0, x1, y1)
 
 
+def _fit_target_rect(
+    clip_rect: fitz.Rect, cell_w_pt: float, cell_h_pt: float, rotation_deg: int,
+) -> fitz.Rect:
+    """Prostokąt docelowy dla `show_pdf_page`: rozmiar clipu (1:1), wyśrodkowany
+    w kaflu. Źródła NIGDY nie rozciągamy — gdy clip = kafel, cel = cały kafel;
+    gdy clip jest mniejszy (strona źródła < kafel, np. footprint z marginesem +3mm
+    w trybie manualnym), zostaje margines dookoła zamiast rozdmuchania druku."""
+    tw, th = clip_rect.width, clip_rect.height
+    if rotation_deg in (90, 270):
+        tw, th = th, tw
+    tx = (cell_w_pt - tw) / 2.0
+    ty = (cell_h_pt - th) / 2.0
+    return fitz.Rect(tx, ty, tx + tw, ty + th)
+
+
 class _SourceCache:
     """Otwiera każdy plik źródłowy najwyżej raz w obrębie jednego eksportu.
 
@@ -145,10 +160,8 @@ def _render_cell_stamp(
     )
     with fitz.open() as stamp:
         page = stamp.new_page(width=cell_w_pt, height=cell_h_pt)
-        page.show_pdf_page(
-            fitz.Rect(0, 0, cell_w_pt, cell_h_pt),
-            src, page_index, rotate=rotation_deg, clip=clip_rect,
-        )
+        target = _fit_target_rect(clip_rect, cell_w_pt, cell_h_pt, rotation_deg)
+        page.show_pdf_page(target, src, page_index, rotate=rotation_deg, clip=clip_rect)
         return stamp.tobytes()
 
 
