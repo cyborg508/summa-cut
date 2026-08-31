@@ -343,3 +343,36 @@ def test_manual_item_without_dimension_uses_pdf_size(tmp_path):
     )
     job = build_job(params, session)
     assert job.montage_items[0].print_page_size_mm == (40.0, 30.0)
+
+
+# --- rotation_mode → ItemSpec ---
+
+def test_rotation_mode_auto_lets_engine_choose(tmp_path):
+    s = _session_with_pdf(tmp_path)
+    job = build_job(_params(rotation_mode="auto"), s)
+    assert job.item_spec.rotation_allowed is True
+    assert job.item_spec.forced_rotation_deg is None
+
+
+def test_rotation_mode_0_forces_upright(tmp_path):
+    s = _session_with_pdf(tmp_path)
+    job = build_job(_params(rotation_mode="0"), s)
+    assert job.item_spec.forced_rotation_deg == 0
+
+
+def test_rotation_mode_90_forces_rotation(tmp_path):
+    s = _session_with_pdf(tmp_path)
+    job = build_job(_params(rotation_mode="90"), s)
+    assert job.item_spec.forced_rotation_deg == 90
+
+
+def test_missing_rotation_mode_keeps_legacy_rotation_allowed(tmp_path):
+    """Klient bez rotation_mode działa jak dotąd — steruje samym rotation_allowed."""
+    s = _session_with_pdf(tmp_path)
+    job = build_job(_params(rotation_allowed=True), s)
+    assert job.item_spec.rotation_allowed is True
+    assert job.item_spec.forced_rotation_deg is None
+
+    job_off = build_job(_params(rotation_allowed=False), s)
+    assert job_off.item_spec.rotation_allowed is False
+    assert job_off.item_spec.forced_rotation_deg is None

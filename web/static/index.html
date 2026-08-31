@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>summa-cut web</title>
-  <link rel="stylesheet" href="/static/style.css?v=8">
+  <link rel="stylesheet" href="/static/style.css?v=9">
 </head>
 <body>
   <header><h1>summa-cut <span class="muted">— impozytor druk + wykrojnik</span></h1></header>
@@ -36,7 +36,13 @@
         <legend>Użytek (mm)</legend>
         <label>Użytek szer. <input type="number" id="item-w" value="30" step="0.1" min="0.1"></label>
         <label>wys. <input type="number" id="item-h" value="30" step="0.1" min="0.1"></label>
-        <label><input type="checkbox" id="rotation"> pozwól obrót 90°</label>
+        <label>Orientacja
+          <select id="rotation-mode">
+            <option value="auto">Auto — więcej użytków wygrywa</option>
+            <option value="0" selected>Wymuś 0°</option>
+            <option value="90">Wymuś 90°</option>
+          </select>
+        </label>
       </fieldset>
 
       <fieldset>
@@ -127,6 +133,6 @@
       </div>
     </section>
   </main>
-  <script src="/static/app.js?v=8"></script>
+  <script src="/static/app.js?v=9"></script>
 </body>
 </html>

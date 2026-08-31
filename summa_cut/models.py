@@ -42,6 +42,9 @@ class ItemSpec:
     width_mm: float = 0.0
     height_mm: float = 0.0
     rotation_allowed: bool = False
+    # None = silnik sam wybiera lepszy wariant (zachowanie domyślne).
+    # 0 lub 90 = użyj TYLKO tej orientacji, nawet gdy mieści się mniej użytków.
+    forced_rotation_deg: int | None = None
 
 
 @dataclass

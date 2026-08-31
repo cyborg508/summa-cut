@@ -161,9 +161,17 @@ def compute_layout(job: JobSettings) -> LayoutResult:
 
     base_width_mm = job.item_spec.width_mm + gap_mm
     base_height_mm = job.item_spec.height_mm + gap_mm
-    dims = [(base_width_mm, base_height_mm, 0)]
-    if job.item_spec.rotation_allowed and base_width_mm != base_height_mm:
-        dims.append((base_height_mm, base_width_mm, 90))
+    forced = job.item_spec.forced_rotation_deg
+    if forced == 90:
+        # Wymuszenie stosujemy też do kwadratu — kafel jest ten sam, ale grafika
+        # w środku nie musi być symetryczna.
+        dims = [(base_height_mm, base_width_mm, 90)]
+    elif forced == 0:
+        dims = [(base_width_mm, base_height_mm, 0)]
+    else:
+        dims = [(base_width_mm, base_height_mm, 0)]
+        if job.item_spec.rotation_allowed and base_width_mm != base_height_mm:
+            dims.append((base_height_mm, base_width_mm, 90))
 
     for width_mm, height_mm, rotation_deg in dims:
         if job.split_horizontal_groups:

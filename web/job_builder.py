@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Literal
+
 from pydantic import BaseModel, Field
 
 from summa_cut.models import ItemSpec, JobSettings, MontageItem, OposSpec, SelectedPage, SheetSpec, SpecialModePattern
@@ -39,6 +41,9 @@ class JobParams(BaseModel):
     sheet_h_mm: float = 480.0
     item_w_mm: float
     item_h_mm: float
+    # "auto" = silnik wybiera lepszy wariant; "0"/"90" = wymuszona orientacja.
+    # None (pole nieprzysłane) → zgodność wsteczna: decyduje samo rotation_allowed.
+    rotation_mode: Literal["auto", "0", "90"] | None = None
     rotation_allowed: bool = False
 
     gap_enabled: bool = True
@@ -96,6 +101,15 @@ def _build_montage_items(params: JobParams, session: Session) -> list[MontageIte
             quantity=m.quantity,
         ))
     return items
+
+
+def _item_spec(params: JobParams) -> ItemSpec:
+    """`rotation_mode` ma pierwszeństwo; jego brak = stare zachowanie na `rotation_allowed`."""
+    if params.rotation_mode == "auto":
+        return ItemSpec(params.item_w_mm, params.item_h_mm, True)
+    if params.rotation_mode in ("0", "90"):
+        return ItemSpec(params.item_w_mm, params.item_h_mm, True, forced_rotation_deg=int(params.rotation_mode))
+    return ItemSpec(params.item_w_mm, params.item_h_mm, params.rotation_allowed)
 
 
 def _pad2(values: list[float]) -> list[float]:
@@ -262,7 +276,7 @@ def build_job(params: JobParams, session: Session) -> JobSettings:
         print_content_bbox_pt=print_content_bbox_pt,
         cut_content_bbox_pt=cut_content_bbox_pt,
         sheet_spec=SheetSpec(params.sheet_w_mm, params.sheet_h_mm),
-        item_spec=ItemSpec(params.item_w_mm, params.item_h_mm, params.rotation_allowed),
+        item_spec=_item_spec(params),
         gap_enabled=with_gap,
         gap_mm=params.gap_mm if with_gap else 0.0,
         generate_cut_grid=not with_gap,

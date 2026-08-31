@@ -745,7 +745,7 @@ function collectParams() {
     sheet_h_mm: parseFloat($("sheet-h").value),
     item_w_mm: parseFloat($("item-w").value),
     item_h_mm: parseFloat($("item-h").value),
-    rotation_allowed: $("rotation").checked,
+    rotation_mode: $("rotation-mode").value,
     gap_enabled: gap,
     gap_mm: parseFloat($("gap-mm").value),
     split_horizontal_groups: $("split").checked,
@@ -790,10 +790,15 @@ async function applyJob() {
   if (r.ok) {
     const s = await r.json();
     clearError();
+    const forced = $("rotation-mode").value !== "auto";
     $("summary").textContent =
       `Użytków: ${s.count} (pojemność ${s.capacity_count}` +
       (s.requested_count ? `, zamówiono ${s.requested_count}` : "") +
-      `) · ${s.rows}×${s.columns}` + (s.used_rotation ? " · obrót 90°" : "");
+      `) · ${s.rows}×${s.columns}` +
+      (s.used_rotation ? (forced ? " · obrót 90° (wymuszony)" : " · obrót 90°") : "");
+    if (s.count === 0 && forced) {
+      showError(`Wymuszona orientacja ${$("rotation-mode").value}° nie mieści się na arkuszu — zmień orientację na Auto albo zmniejsz użytek.`);
+    }
     return true;
   }
   showError((await r.json()).detail || "Błąd układu.");

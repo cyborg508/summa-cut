@@ -27,7 +27,7 @@ def test_static_assets_served(tmp_path):
 REQUIRED_IDS = [
     "upload-input", "upload-btn", "uploads-list",
     "print-file", "print-page", "cut-file", "cut-page",
-    "sheet-w", "sheet-h", "item-w", "item-h", "rotation",
+    "sheet-w", "sheet-h", "item-w", "item-h", "rotation-mode",
     "gap-mm", "split", "split-spread", "manual", "manual-cols", "manual-rows",
     "opos-side", "opos-bottom", "opos-top",
     "montage-enable", "montage-rows", "montage-add",
@@ -38,7 +38,7 @@ REQUIRED_IDS = [
 ]
 
 
-REMOVED_IDS = ["base-name", "download-print", "download-cut"]
+REMOVED_IDS = ["base-name", "download-print", "download-cut", "rotation"]
 
 
 def test_index_no_longer_has_removed_ids(tmp_path):
@@ -152,3 +152,20 @@ def test_app_js_auto_assign_sources():
     assert "autoAssignSources" in js and "assignSource" in js
     # auto-przypisanie wołane po wgraniu
     assert "autoAssignSources(newNames)" in js
+
+
+def test_rotation_mode_select_offers_auto_and_both_forced_orientations(tmp_path):
+    html = _client(tmp_path).get("/").text
+    select = html.split('id="rotation-mode"')[1].split("</select>")[0]
+    assert 'value="auto"' in select
+    assert 'value="0"' in select
+    assert 'value="90"' in select
+
+
+def test_rotation_mode_defaults_to_forced_0_like_the_old_unchecked_checkbox(tmp_path):
+    """Stary checkbox był domyślnie odznaczony = tylko 0°. Kto nie ruszy pola, dostaje to samo co wczoraj."""
+    html = _client(tmp_path).get("/").text
+    select = html.split('id="rotation-mode"')[1].split("</select>")[0]
+    selected = [line for line in select.splitlines() if "selected" in line]
+    assert len(selected) == 1
+    assert 'value="0"' in selected[0]

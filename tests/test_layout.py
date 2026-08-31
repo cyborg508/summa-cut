@@ -55,3 +55,43 @@ def test_split_groups_even_rows_two_groups():
     groups = {p.group for p in res.placements}
     assert groups == {0, 1}
     assert res.rows % 2 == 0
+
+
+# --- wymuszona orientacja (forced_rotation_deg) ---
+
+def test_forced_90_wins_even_when_0_packs_more():
+    # użytek 100x40 w polu 310x430, gap 3 → 0°: 3x10=30, 90°: 7x4=28
+    auto = compute_layout(_job(item_spec=ItemSpec(100, 40, True)))
+    assert (auto.count, auto.used_rotation) == (30, False)
+
+    forced = compute_layout(_job(item_spec=ItemSpec(100, 40, True, forced_rotation_deg=90)))
+    assert (forced.count, forced.used_rotation) == (28, True)
+    assert all(p.rotation_deg == 90 for p in forced.placements)
+
+
+def test_forced_0_ignores_better_rotated_variant():
+    # użytek 40x100 → 0°: 7x4=28, 90°: 3x10=30 (auto wybierze 90°)
+    auto = compute_layout(_job(item_spec=ItemSpec(40, 100, True)))
+    assert (auto.count, auto.used_rotation) == (30, True)
+
+    forced = compute_layout(_job(item_spec=ItemSpec(40, 100, True, forced_rotation_deg=0)))
+    assert (forced.count, forced.used_rotation) == (28, False)
+    assert all(p.rotation_deg == 0 for p in forced.placements)
+
+
+def test_forced_90_applies_to_square_item():
+    # kwadrat: obrót nie zmienia upakowania, ale grafika w środku może nie być symetryczna
+    forced = compute_layout(_job(item_spec=ItemSpec(50, 50, False, forced_rotation_deg=90)))
+    assert forced.count == 40
+    assert forced.used_rotation is True
+    assert all(p.rotation_deg == 90 for p in forced.placements)
+
+
+def test_forced_orientation_that_does_not_fit_yields_nothing():
+    # użytek 40x420 mieści się na leżąco (7x1), po wymuszeniu 90° szerokość 423 > 310
+    auto = compute_layout(_job(item_spec=ItemSpec(40, 420, True)))
+    assert auto.count == 7
+
+    forced = compute_layout(_job(item_spec=ItemSpec(40, 420, True, forced_rotation_deg=90)))
+    assert forced.count == 0
+    assert forced.placements == []
