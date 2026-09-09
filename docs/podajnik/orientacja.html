@@ -1,0 +1,50 @@
+<h2>Doprecyzujmy orientację — kliknij właściwą</h2>
+<p class="subtitle">To decyduje o wszystkim: szerokości podajnika, rozstawie rolek, drodze arkusza i czasie cyklu. Zielona strzałka = kierunek wjazdu arkusza w ploter.</p>
+
+<div class="cards">
+  <div class="card" data-choice="a" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <svg viewBox="0 0 460 420" style="width:100%;height:auto">
+        <rect x="20" y="40" width="420" height="130" fill="#e9e9ee" stroke="#888"/>
+        <line x1="20" y1="150" x2="440" y2="150" stroke="#555" stroke-width="5" stroke-dasharray="3 5"/>
+        <circle cx="150" cy="150" r="11" fill="#fff" stroke="#333" stroke-width="3"/>
+        <circle cx="290" cy="150" r="11" fill="#fff" stroke="#333" stroke-width="3"/>
+        <rect x="140" y="60" width="160" height="240" fill="#fff9e6" stroke="#c99a00" stroke-width="3"/>
+        <text x="150" y="200" font-size="20" fill="#a37b00">330 mm</text>
+        <text x="150" y="228" font-size="20" fill="#a37b00">w poprzek</text>
+        <text x="310" y="200" font-size="18" fill="#a37b00">488 mm</text>
+        <text x="310" y="224" font-size="18" fill="#a37b00">w głąb</text>
+        <path d="M 220 390 L 220 320" stroke="#2a7" stroke-width="6" marker-end="url(#m1)"/>
+        <defs><marker id="m1" markerWidth="10" markerHeight="10" refX="5" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#2a7"/></marker></defs>
+      </svg>
+    </div>
+    <div class="card-body">
+      <h3>A — krawędź czołowa 330 mm</h3>
+      <p>Arkusz wąski (330) w poprzek maszyny, jedzie 488 mm w głąb. Tak było na poprzednim rysunku. Rolki dociskowe blisko siebie, dłuższa droga posuwu.</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="b" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <svg viewBox="0 0 460 420" style="width:100%;height:auto">
+        <rect x="20" y="40" width="420" height="130" fill="#e9e9ee" stroke="#888"/>
+        <line x1="20" y1="150" x2="440" y2="150" stroke="#555" stroke-width="5" stroke-dasharray="3 5"/>
+        <circle cx="110" cy="150" r="11" fill="#fff" stroke="#333" stroke-width="3"/>
+        <circle cx="350" cy="150" r="11" fill="#fff" stroke="#333" stroke-width="3"/>
+        <rect x="100" y="60" width="260" height="170" fill="#fff9e6" stroke="#c99a00" stroke-width="3"/>
+        <text x="115" y="200" font-size="20" fill="#a37b00">488 mm w poprzek</text>
+        <text x="115" y="270" font-size="18" fill="#a37b00">330 mm w głąb</text>
+        <path d="M 230 390 L 230 250" stroke="#2a7" stroke-width="6" marker-end="url(#m2)"/>
+        <defs><marker id="m2" markerWidth="10" markerHeight="10" refX="5" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#2a7"/></marker></defs>
+      </svg>
+    </div>
+    <div class="card-body">
+      <h3>B — krawędź czołowa 488 mm</h3>
+      <p>Arkusz szeroki (488) w poprzek maszyny, jedzie tylko 330 mm w głąb. Szerszy rozstaw rolek = stabilniej, mniej skosu, krótszy cykl.</p>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <p class="subtitle">Uwaga: przy wariancie B arkusz i tak musi mieć w polu OPOS zapas — Summa wymaga min. 10 mm od boków i dołu oraz 35 mm od góry. Przy 330 mm głębokości to zjada ~45 mm, zostaje ~285 mm pola roboczego w osi posuwu.</p>
+</div>

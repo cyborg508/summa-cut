@@ -1,0 +1,108 @@
+<h2>Architektura — sześć modułów</h2>
+<p class="subtitle">Każdy da się zbudować, wyregulować i przetestować osobno. To celowe: gdy coś zawiedzie, wymieniasz jeden moduł, nie maszynę.</p>
+
+<div class="mockup">
+  <div class="mockup-header">Przekrój boczny — tył po lewej, przód po prawej</div>
+  <div class="mockup-body">
+    <svg viewBox="0 0 1180 560" style="width:100%;height:auto">
+      <defs>
+        <marker id="gg" markerWidth="9" markerHeight="9" refX="4.5" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="#2a7"/></marker>
+        <marker id="bb" markerWidth="9" markerHeight="9" refX="4.5" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="#39f"/></marker>
+      </defs>
+
+      <!-- PLOTER -->
+      <rect x="560" y="150" width="250" height="80" fill="#3a3a42" stroke="#222"/>
+      <text x="592" y="198" font-size="17" fill="#fff">Summa S One D120</text>
+      <line x1="545" y1="262" x2="820" y2="262" stroke="#777" stroke-width="5"/>
+      <circle cx="640" cy="248" r="14" fill="#9ec9ff" stroke="#333" stroke-width="3"/>
+
+      <!-- M4 dzwignia -->
+      <path d="M 800 150 q 34 -22 52 6" stroke="#2a6ec9" stroke-width="9" fill="none"/>
+      <rect x="846" y="120" width="70" height="40" fill="#ffe9b0" stroke="#c99a00" stroke-width="2"/>
+      <text x="852" y="146" font-size="15" fill="#8a6a00">M4 serwo</text>
+      <text x="790" y="120" font-size="14" fill="#2a6ec9">dźwignia rolek</text>
+
+      <!-- M1 magazyn -->
+      <g>
+        <path d="M 60 250 L 300 200" stroke="#666" stroke-width="5"/>
+        <path d="M 62 236 L 298 188" stroke="#c99a00" stroke-width="9"/>
+        <path d="M 58 258 L 62 300" stroke="#666" stroke-width="5"/>
+        <text x="60" y="330" font-size="16" fill="#333">M1 magazyn ~100 ark.</text>
+        <text x="60" y="352" font-size="14" fill="#777">stos tylko ~13 mm — bez windy</text>
+      </g>
+
+      <!-- M2 separacja -->
+      <g>
+        <rect x="232" y="96" width="40" height="30" fill="#ffe9b0" stroke="#c99a00" stroke-width="2"/>
+        <path d="M 252 126 L 252 152" stroke="#666" stroke-width="5"/>
+        <ellipse cx="252" cy="160" rx="20" ry="9" fill="#d7f0e0" stroke="#2a7" stroke-width="3"/>
+        <text x="196" y="86" font-size="16" fill="#2a7">M2 przyssawka</text>
+        <path d="M 340 214 q -44 -12 -78 -18" stroke="#39f" stroke-width="3" fill="none" stroke-dasharray="6 4" marker-end="url(#bb)"/>
+        <path d="M 340 226 q -50 -4 -92 -2" stroke="#39f" stroke-width="3" fill="none" stroke-dasharray="6 4" marker-end="url(#bb)"/>
+        <text x="330" y="252" font-size="15" fill="#39f">nadmuch 0,3 bara</text>
+      </g>
+
+      <!-- M3 deck + rolki -->
+      <g>
+        <line x1="300" y1="252" x2="560" y2="252" stroke="#999" stroke-width="6"/>
+        <text x="330" y="300" font-size="16" fill="#333">M3 blat + rolki podające</text>
+        <circle cx="450" cy="238" r="17" fill="#d7f0e0" stroke="#2a7" stroke-width="3"/>
+        <circle cx="450" cy="208" r="13" fill="#fff" stroke="#2a7" stroke-width="2"/>
+        <path d="M 450 186 L 450 168" stroke="#c33" stroke-width="4" marker-end="url(#gg)"/>
+        <text x="404" y="160" font-size="14" fill="#c33">docisk się PODNOSI</text>
+        <rect x="516" y="226" width="10" height="16" fill="#c33"/>
+        <text x="470" y="330" font-size="14" fill="#c33">czujnik krawędzi → stała droga</text>
+      </g>
+
+      <!-- arkusz -->
+      <path d="M 470 246 L 800 242 L 880 360" stroke="#c99a00" stroke-width="4" fill="none"/>
+
+      <!-- M5 odbior -->
+      <g>
+        <circle cx="856" cy="278" r="18" fill="#ffd9d9" stroke="#c33" stroke-width="3"/>
+        <path d="M 856 250 L 900 214" stroke="#c33" stroke-width="5"/>
+        <text x="880" y="300" font-size="16" fill="#c33">M5 rolka odbierająca</text>
+        <path d="M 900 380 L 970 470 L 1090 470 L 1130 380" stroke="#666" stroke-width="4" fill="none"/>
+        <text x="980" y="450" font-size="15" fill="#555">kosz</text>
+      </g>
+
+      <!-- M6 sterownik -->
+      <rect x="80" y="420" width="230" height="70" fill="#eef3ff" stroke="#39f" stroke-width="2"/>
+      <text x="96" y="450" font-size="16" fill="#1a5" >M6 sterownik ESP32</text>
+      <text x="96" y="474" font-size="14" fill="#555">+ akcelerometr na ramie plotera</text>
+      <path d="M 312 452 q 200 30 540 -140" stroke="#39f" stroke-width="2" fill="none" stroke-dasharray="4 4"/>
+    </svg>
+  </div>
+</div>
+
+<div class="section">
+  <h3>Moduły i ich granice</h3>
+  <table style="width:100%;border-collapse:collapse;font-size:15px">
+    <tr style="text-align:left;border-bottom:2px solid #999"><th>Moduł</th><th>Robi</th><th>Z czego</th><th>Test odbiorczy</th></tr>
+    <tr style="border-bottom:1px solid #ddd"><td><strong>M1 magazyn</strong></td><td>trzyma ~100 ark. 330×488, prowadnice boczne, stos zawsze w tym samym miejscu</td><td>pleksi laser + narożniki 3D</td><td>stos nie rozjeżdża się po 100 pobraniach</td></tr>
+    <tr style="border-bottom:1px solid #ddd"><td><strong>M2 separacja</strong></td><td>oddziela i podaje DOKŁADNIE jeden arkusz na blat</td><td>eżektor Venturi, 2 zawory 12 V, przyssawki, ramię na serwie</td><td><strong>50/50 pojedynczo</strong> na świeżym, naelektryzowanym stosie</td></tr>
+    <tr style="border-bottom:1px solid #ddd"><td><strong>M3 podawanie</strong></td><td>wsuwa arkusz na stałą głębokość, potem <strong>rozwiera docisk</strong></td><td>silnik krokowy i rolki ze starej drukarki, czujnik IR</td><td>rozrzut wsunięcia &lt; ±1,5 mm w 50 próbach (budżet OPOS: ±3 mm)</td></tr>
+    <tr style="border-bottom:1px solid #ddd"><td><strong>M4 dźwignia</strong></td><td>podnosi i opuszcza dźwignię rolek dociskowych</td><td>siłownik liniowy 12 V + obejma 3D na dźwigni</td><td>200 cykli bez przestawienia się mocowania</td></tr>
+    <tr style="border-bottom:1px solid #ddd"><td><strong>M5 odbiór</strong></td><td>wypycha wycięty arkusz z przodu do kosza</td><td>rolka na ramieniu, silnik DC + serwo</td><td>50/50 arkuszy opuszcza maszynę</td></tr>
+    <tr><td><strong>M6 sterownik</strong></td><td>sekwencja, czasy, wykrywanie końca cięcia, obsługa błędów</td><td>ESP32 + sterownik krokowca + panel WWW przez WiFi</td><td>seria 100 arkuszy bez interwencji</td></tr>
+  </table>
+</div>
+
+<div class="section">
+  <h3>Trzy decyzje, które są mniej oczywiste, niż wyglądają</h3>
+
+  <p><strong>1. Docisk rolek podających MUSI się rozwierać.</strong> Podczas cięcia ploter przesuwa arkusz w przód i w tył — przy 488 mm arkusza jego tył wyjeżdża daleko za maszynę, po naszym blacie. Gdyby rolki podające trzymały arkusz, ploter by go szarpał albo zgubił pozycję. Po wsunięciu docisk idzie w górę i arkusz swobodnie ślizga się po pleksi.</p>
+
+  <p><strong>2. Koniec cięcia wykrywa akcelerometr przyklejony do ramy plotera, nie kamera i nie zegar.</strong> Cięcie to nieprzerwane drgania. Cisza przez 10 s = koniec pracy. Kosztuje 15 zł, nie wymaga celowania obiektywem, nie przeszkadza mu światło ani to, że praca raz trwa minutę, a raz pięć.</p>
+
+  <p><strong>3. Do tego twarda bramka czasowa.</strong> Jeśli „cisza" przyjdzie po 20 sekundach, to nie koniec pracy tylko <strong>ploter stanął z błędem</strong> — np. nie znalazł OPOS-a. Bez tego zabezpieczenia podajnik dosunąłby kolejny arkusz na zakleszczony i tak 80 razy. Minimalny czas pracy ustawiasz raz w panelu; szybciej = stop i alarm.</p>
+</div>
+
+<div class="section">
+  <h3>Czego świadomie NIE ma w projekcie</h3>
+  <ul style="font-size:15px">
+    <li><strong>Żadnej komunikacji z Summą</strong> — ani USB, ani przerabiania elektroniki, ani dotykania ekranu. Operator raz puszcza pracę i raz ustawia pierwszy OPOS, dalej pętla jest ślepa.</li>
+    <li><strong>Żadnej stacji rejestracji z wybrzuszaniem arkusza</strong> — przy tolerancji OPOS ±3 mm to przepłacanie dokładności, której ploter nie wykorzysta.</li>
+    <li><strong>Żadnego wiercenia w ploterze</strong> — wszystko na obejmach do istniejącego stelaża roli i ramy stojaka.</li>
+  </ul>
+</div>

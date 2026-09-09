@@ -1,0 +1,96 @@
+<h2>Separacja naelektryzowanych arkuszy 120 g</h2>
+<p class="subtitle">To jest teraz sedno projektu. Reszta konstrukcji jest prosta — jeśli separacja zawiedzie, cała maszyna jest bezużyteczna. Kliknij metodę, w którą wierzysz.</p>
+
+<div class="section">
+  <p><strong>Skala problemu:</strong> stos 100 ark. × 120 g ≈ <strong>13 mm</strong>. Niski stos = brak potrzeby windy, wystarczy sprężynowana półka. Cały wysiłek idzie w oddzielenie jednego arkusza od drugiego.</p>
+</div>
+
+<div class="cards">
+
+  <div class="card" data-choice="rozki" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <svg viewBox="0 0 420 260" style="width:100%;height:auto">
+        <rect x="40" y="150" width="330" height="26" fill="#f2f2f7" stroke="#999"/>
+        <line x1="40" y1="148" x2="370" y2="148" stroke="#c99a00" stroke-width="3"/>
+        <path d="M 348 130 L 372 130 L 372 152 L 348 152" fill="none" stroke="#c33" stroke-width="5"/>
+        <text x="286" y="120" font-size="15" fill="#c33">rożek</text>
+        <circle cx="180" cy="128" r="24" fill="#d7f0e0" stroke="#2a7" stroke-width="3"/>
+        <path d="M 200 140 q 30 -4 60 4" stroke="#c99a00" stroke-width="3" fill="none"/>
+        <text x="60" y="215" font-size="15" fill="#555">arkusz wybrzusza się i wyskakuje spod rożków</text>
+      </svg>
+    </div>
+    <div class="card-body">
+      <h3>A — rolka + rożki narożne</h3>
+      <p>Klasyka nakładaków. Dwa metalowe narożniki przytrzymują rogi stosu; rolka pcha arkusz, ten się wybrzusza i wyskakuje spod rożków pojedynczo.</p>
+      <p><strong>Za:</strong> zero elektroniki, laser + druk 3D, kilka złotych.<br>
+      <strong>Przeciw:</strong> przy silnej statyce potrafi wyciągnąć dwa naraz. Wymaga cierpliwej regulacji pod konkretny papier.</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="retard" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <svg viewBox="0 0 420 260" style="width:100%;height:auto">
+        <rect x="30" y="150" width="250" height="26" fill="#f2f2f7" stroke="#999"/>
+        <circle cx="290" cy="128" r="26" fill="#d7f0e0" stroke="#2a7" stroke-width="3"/>
+        <circle cx="292" cy="180" r="20" fill="#ffd9d9" stroke="#c33" stroke-width="3"/>
+        <text x="250" y="228" font-size="15" fill="#c33">rolka hamująca (retard)</text>
+        <path d="M 316 152 L 390 150" stroke="#c99a00" stroke-width="3"/>
+        <text x="150" y="112" font-size="15" fill="#2a7">rolka pobierająca</text>
+      </svg>
+    </div>
+    <div class="card-body">
+      <h3>B — rolka pobierająca + rolka hamująca</h3>
+      <p>Rozwiązanie z każdej drukarki biurowej. Dolna rolka kręci się w przeciwną stronę (albo stoi na sprzęgle) i zawraca drugi arkusz.</p>
+      <p><strong>Za:</strong> sprawdzone na cienkim papierze, części z rozbiórki starej drukarki laserowej.<br>
+      <strong>Przeciw:</strong> gumy się glazurują i po jakimś czasie trzeba je czyścić/wymieniać. Statyka nadal potrafi ją przechytrzyć.</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="ssanie" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <svg viewBox="0 0 420 260" style="width:100%;height:auto">
+        <rect x="40" y="160" width="330" height="26" fill="#f2f2f7" stroke="#999"/>
+        <path d="M 70 158 q 120 -46 250 -2" stroke="#c99a00" stroke-width="4" fill="none"/>
+        <rect x="150" y="80" width="34" height="26" fill="#ffe9b0" stroke="#c99a00" stroke-width="2"/>
+        <path d="M 167 106 L 167 124" stroke="#666" stroke-width="4"/>
+        <ellipse cx="167" cy="130" rx="17" ry="8" fill="#d7f0e0" stroke="#2a7" stroke-width="3"/>
+        <text x="196" y="100" font-size="15" fill="#2a7">przyssawka</text>
+        <path d="M 380 190 q -40 -14 -70 -22" stroke="#39f" stroke-width="3" fill="none" stroke-dasharray="5 4"/>
+        <path d="M 380 200 q -46 -8 -84 -8" stroke="#39f" stroke-width="3" fill="none" stroke-dasharray="5 4"/>
+        <text x="300" y="234" font-size="15" fill="#39f">nadmuch rozdziela stos</text>
+      </svg>
+    </div>
+    <div class="card-body">
+      <h3>C — przyssawka + nadmuch <em>(rekomendacja)</em></h3>
+      <p>To, co robi każda maszyna drukarska: strumień powietrza wdmuchiwany w bok stosu rozdziela górne arkusze, przyssawka unosi tylko wierzchni.</p>
+      <p><strong>Za:</strong> jedyna metoda, która atakuje statykę bezpośrednio — powietrze wchodzi między arkusze niezależnie od tego, jak mocno się kleją. Znasz ją z hali.<br>
+      <strong>Przeciw:</strong> pompka + dmuchawa + zawór = najwięcej części. Hałas.</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="jonizator" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <svg viewBox="0 0 420 260" style="width:100%;height:auto">
+        <rect x="40" y="160" width="330" height="26" fill="#f2f2f7" stroke="#999"/>
+        <rect x="120" y="80" width="200" height="18" fill="#eee" stroke="#666"/>
+        <text x="126" y="72" font-size="15" fill="#333">listwa jonizująca</text>
+        <g stroke="#39f" stroke-width="2">
+          <path d="M150 100 L146 140"/><path d="M190 100 L188 140"/><path d="M230 100 L232 140"/><path d="M270 100 L274 140"/>
+        </g>
+        <text x="120" y="230" font-size="15" fill="#555">ładunek znika, papier przestaje się kleić</text>
+      </svg>
+    </div>
+    <div class="card-body">
+      <h3>D — zbicie ładunku u źródła</h3>
+      <p>Nie metoda separacji, tylko usunięcie przyczyny: listwa jonizująca nad magazynem, uziemiona szczotka/tasiemka miedziana na drodze papieru, uziemiona rama.</p>
+      <p><strong>Za:</strong> tanie i wzmacnia każdą z pozostałych metod. Uziemienie ramy trzeba zrobić i tak.<br>
+      <strong>Przeciw:</strong> samo z siebie nie poda arkusza — to dodatek, nie rozwiązanie.</p>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>Co proponuję zrobić najpierw</h3>
+  <p>Separacja to jedyny element, który może wywrócić cały projekt — więc buduje się ją <strong>pierwszą i osobno</strong>, jako makietę na blacie, zanim powstanie rama, magazyn czy serwo na dźwigni. Godzina pracy lasera, realny naelektryzowany stos prosto z maszyny, 50 prób pod rząd. Jeśli metoda podaje 50/50 pojedynczo — budujemy resztę. Jeśli nie — zmieniamy metodę, nie tracąc nic poza kawałkiem pleksi.</p>
+  <p class="subtitle">Moja rekomendacja: <strong>C + D razem</strong>. Nadmuch i tak trzeba mieć przy tej statyce, a przyssawka jest jedynym chwytakiem, który nie polega na tarciu — czyli jedynym, którego statyka nie oszuka.</p>
+</div>

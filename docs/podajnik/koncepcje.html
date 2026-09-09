@@ -1,0 +1,91 @@
+<h2>Trzy koncepcje — która skala Ci pasuje?</h2>
+<p class="subtitle">Wszystkie robią to samo. Różnią się tym, ile mechaniki bierzesz na siebie i ile ryzyka zostaje. Kliknij tę, w którą idziemy.</p>
+
+<div class="section">
+  <h3>Wspólny szkielet — to jest w każdej wersji</h3>
+  <div class="mockup">
+    <div class="mockup-header">Przekrój boczny: tył (lewo) → ploter → przód (prawo)</div>
+    <div class="mockup-body">
+      <svg viewBox="0 0 1100 470" style="width:100%;height:auto">
+        <defs><marker id="g" markerWidth="9" markerHeight="9" refX="4.5" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="#2a7"/></marker></defs>
+
+        <!-- korpus plotera -->
+        <rect x="480" y="120" width="230" height="70" fill="#3a3a42" stroke="#222"/>
+        <text x="500" y="162" font-size="16" fill="#fff">korpus Summy</text>
+        <line x1="470" y1="215" x2="720" y2="215" stroke="#777" stroke-width="4"/>
+        <circle cx="560" cy="203" r="13" fill="#9ec9ff" stroke="#333" stroke-width="3"/>
+        <text x="524" y="252" font-size="14" fill="#333">rolka dociskowa</text>
+
+        <!-- dźwignia + serwo -->
+        <path d="M 700 120 q 30 -20 46 6" stroke="#2a6ec9" stroke-width="8" fill="none"/>
+        <rect x="742" y="100" width="46" height="34" fill="#ffe9b0" stroke="#c99a00" stroke-width="2"/>
+        <text x="746" y="122" font-size="14" fill="#8a6a00">SERWO</text>
+        <text x="700" y="92" font-size="14" fill="#2a6ec9">dźwignia rolek</text>
+
+        <!-- magazyn arkuszy z tyłu -->
+        <path d="M 60 300 L 300 250" stroke="#666" stroke-width="4"/>
+        <rect x="70" y="255" width="215" height="42" fill="#f2f2f7" stroke="#999" transform="rotate(-12 70 297)"/>
+        <text x="90" y="340" font-size="15" fill="#555">magazyn ~100 ark. (na stelażu roli)</text>
+
+        <!-- bramka + rolka pobierajaca (od spodu) -->
+        <circle cx="300" cy="268" r="17" fill="#d7f0e0" stroke="#2a7" stroke-width="3"/>
+        <rect x="316" y="238" width="8" height="24" fill="#c33"/>
+        <text x="250" y="212" font-size="14" fill="#2a7">pobieranie SPOD stosu</text>
+        <text x="316" y="228" font-size="14" fill="#c33">bramka</text>
+
+        <!-- rolki podajace -->
+        <circle cx="400" cy="248" r="15" fill="#d7f0e0" stroke="#2a7" stroke-width="3"/>
+        <circle cx="400" cy="222" r="12" fill="#fff" stroke="#2a7" stroke-width="2"/>
+        <path d="M 420 232 L 470 218" stroke="#2a7" stroke-width="5" marker-end="url(#g)"/>
+        <text x="352" y="300" font-size="14" fill="#2a7">rolki podające<tspan x="352" dy="18">(stała droga)</tspan></text>
+
+        <!-- arkusz w ploterze -->
+        <path d="M 430 214 L 700 210 L 760 300" stroke="#c99a00" stroke-width="4" fill="none"/>
+        <text x="742" y="330" font-size="14" fill="#a37b00">arkusz zwiesza się z przodu</text>
+
+        <!-- odbior -->
+        <circle cx="742" cy="238" r="16" fill="#ffd9d9" stroke="#c33" stroke-width="3"/>
+        <text x="770" y="232" font-size="14" fill="#c33">rolka odbierająca na ramieniu</text>
+
+        <!-- kosz -->
+        <path d="M 800 330 L 880 430 L 1010 430 L 1050 330" stroke="#666" stroke-width="4" fill="none"/>
+        <text x="880" y="410" font-size="15" fill="#555">kosz</text>
+      </svg>
+    </div>
+  </div>
+  <p class="subtitle"><strong>Dlaczego pobieranie spod stosu, a nie z wierzchu:</strong> płaszczyzna podawania jest stała niezależnie od tego, czy w magazynie leży 100 czy 3 arkusze — odpada cała mechanika podnoszenia stosu. Rolka nie dotyka zadrukowanej strony. Można dokładać arkusze w trakcie pracy. A bramka szczelinowa (~1,5 grubości) fizycznie nie przepuści dwóch arkuszy, choćby się skleiły od elektrostatyki.</p>
+</div>
+
+<div class="options">
+  <div class="option" data-choice="min" onclick="toggleSelect(this)">
+    <div class="letter">1</div>
+    <div class="content">
+      <h3>Minimum — 2 silniki, buduje się w weekend</h3>
+      <p>Serwo na dźwigni + jeden silnik krokowy napędzający i rolkę pobierającą, i rolki podające (jeden wał, sprzęgło jednokierunkowe). Odbiór: rolka na serwie. Koniec cięcia = <strong>czasówka</strong> nastawiana pokrętłem, z zapasem (np. 6 min przy pracach do 5 min).</p>
+      <p><strong>Ryzyko:</strong> czasówka marnuje czas przy krótkich pracach i wykłada się, gdy praca trwa dłużej niż nastawa. Brak wykrywania dubla i braku arkusza — jak coś pójdzie źle, dowiesz się po 40 zmarnowanych arkuszach.</p>
+    </div>
+  </div>
+
+  <div class="option" data-choice="sredni" onclick="toggleSelect(this)">
+    <div class="letter">2</div>
+    <div class="content">
+      <h3>Rekomendacja — to samo + czujniki i wykrywanie końca cięcia</h3>
+      <p>Mechanika jak w 1, ale osobne silniki dla separacji i podawania, plus trzy czujniki optyczne: <em>arkusz pobrany</em>, <em>krawędź czołowa w pozycji</em>, <em>arkusz odebrany</em>. Koniec cięcia wykrywany <strong>brakiem ruchu</strong> — czujnik odbiciowy patrzy na arkusz; cisza przez 10 s = koniec pracy. Działa tak samo przy pracy 1-minutowej i 5-minutowej.</p>
+      <p><strong>Ryzyko:</strong> zostaje tylko elektrostatyka. Przy pierwszym błędzie maszyna staje i piszczy zamiast produkować makulaturę.</p>
+    </div>
+  </div>
+
+  <div class="option" data-choice="max" onclick="toggleSelect(this)">
+    <div class="letter">3</div>
+    <div class="content">
+      <h3>Maksimum — przyssawka + kamera</h3>
+      <p>Separacja przyssawką z pompką (unosi róg arkusza — najodporniejsza metoda na sklejone, naelektryzowane arkusze). Kamera na Raspberry patrzy na panel Summy i na blat: rozpoznaje koniec pracy, komunikat błędu, brak arkusza, przekrzywienie.</p>
+      <p><strong>Ryzyko:</strong> najwięcej roboty i trzeci system do utrzymania. Pompka hałasuje. Sensowne dopiero, gdy 1–2 zawiodą na elektrostatyce.</p>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>Moja rekomendacja: <strong>2</strong>, zbudowane etapami</h3>
+  <p>Rama, magazyn i mocowanie serwa są identyczne we wszystkich trzech — więc buduje się je raz. Zaczynamy od mechaniki z wariantu 1, ale <strong>od razu z ramą przewidzianą pod resztę</strong>: miejsce na czujniki, na drugi silnik i na przyssawkę. Dokładamy dopiero to, co okaże się potrzebne na realnym papierze. Przy tolerancji OPOS ±3 mm budowanie od razu pełnej rejestracji byłoby przepłacaniem dokładności, której ploter i tak nie wykorzysta.</p>
+</div>
