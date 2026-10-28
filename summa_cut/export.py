@@ -15,6 +15,15 @@ from .pdf_io import MM_PER_POINT
 
 POINTS_PER_MM = 1.0 / MM_PER_POINT
 
+# Tryb bez odstępów: skrajne użytki dostają tyle grafiki ze spadu pliku na
+# zewnątrz bloku, żeby skrajne cięcie nie szło po granicy tła. Tylko od strony
+# bez sąsiada — między użytkami cięcie jest wspólne, tam spad nie ma sensu.
+GAPLESS_OUTER_BLEED_MM = 1.0
+
+# Bleed = (lewo, góra, prawo, dół) w mm, w układzie arkusza.
+Bleed = tuple[float, float, float, float]
+NO_BLEED: Bleed = (0.0, 0.0, 0.0, 0.0)
+
 
 @dataclass
 class OutputDocs:
@@ -79,6 +88,65 @@ def _fit_target_rect(
     return fitz.Rect(tx, ty, tx + tw, ty + th)
 
 
+def _outer_bleed_sides(placements: list[Placement], bleed_mm: float) -> list[Bleed]:
+    """Dla każdego użytku: spad na stronach, po których nie ma żadnego sąsiada
+    (także z innej grupy — spad nie może wejść na stykający się użytek)."""
+    eps = 0.01
+
+    def k(v: float) -> float:
+        return round(v, 2)
+
+    right_edges: dict[float, list[tuple[float, float]]] = {}
+    left_edges: dict[float, list[tuple[float, float]]] = {}
+    bottom_edges: dict[float, list[tuple[float, float]]] = {}
+    top_edges: dict[float, list[tuple[float, float]]] = {}
+    for p in placements:
+        x1, y1 = p.x_mm + p.width_mm, p.y_mm + p.height_mm
+        right_edges.setdefault(k(x1), []).append((p.y_mm, y1))
+        left_edges.setdefault(k(p.x_mm), []).append((p.y_mm, y1))
+        bottom_edges.setdefault(k(y1), []).append((p.x_mm, x1))
+        top_edges.setdefault(k(p.y_mm), []).append((p.x_mm, x1))
+
+    def touches(edges: dict, key: float, a0: float, a1: float) -> bool:
+        return any(min(a1, b1) - max(a0, b0) > eps for b0, b1 in edges.get(key, ()))
+
+    result: list[Bleed] = []
+    for p in placements:
+        x1, y1 = p.x_mm + p.width_mm, p.y_mm + p.height_mm
+        left = not touches(right_edges, k(p.x_mm), p.y_mm, y1)
+        right = not touches(left_edges, k(x1), p.y_mm, y1)
+        top = not touches(bottom_edges, k(p.y_mm), p.x_mm, x1)
+        bottom = not touches(top_edges, k(y1), p.x_mm, x1)
+        result.append(tuple(bleed_mm if f else 0.0 for f in (left, top, right, bottom)))
+    return result
+
+
+def _src_sides_from_dest(dest: Bleed, rotation_deg: int) -> Bleed:
+    """Strony kafla (arkusz) → strony źródła. `show_pdf_page(rotate=90)` obraca
+    w lewo: góra źródła ląduje po lewej, lewa na dole, dół po prawej, prawa u góry."""
+    l, t, r, b = dest
+    rot = rotation_deg % 360
+    if rot == 90:
+        return (b, l, t, r)
+    if rot == 180:
+        return (r, b, l, t)
+    if rot == 270:
+        return (t, r, b, l)
+    return dest
+
+
+def _dest_sides_from_src(src: Bleed, rotation_deg: int) -> Bleed:
+    l, t, r, b = src
+    rot = rotation_deg % 360
+    if rot == 90:
+        return (t, r, b, l)
+    if rot == 180:
+        return (r, b, l, t)
+    if rot == 270:
+        return (b, l, t, r)
+    return src
+
+
 class _SourceCache:
     """Otwiera każdy plik źródłowy najwyżej raz w obrębie jednego eksportu.
 
@@ -123,6 +191,7 @@ def _placement_signature(
     content_bbox_pt: tuple[float, float, float, float],
     placement: Placement,
     use_full_page: bool,
+    bleed: Bleed = NO_BLEED,
 ) -> tuple:
     """Klucz identyczności RYSUNKU komórki — bez pozycji (x,y/group/index).
 
@@ -136,6 +205,7 @@ def _placement_signature(
         round(placement.height_mm, 4),
         placement.rotation_deg,
         use_full_page,
+        bleed,
     )
 
 
@@ -147,34 +217,55 @@ def _render_cell_stamp(
     height_mm: float,
     rotation_deg: int,
     use_full_page: bool,
-) -> bytes:
+    bleed: Bleed = NO_BLEED,
+) -> tuple[bytes, Bleed]:
     """Jednostronicowy PDF rozmiaru komórki z osadzonym źródłem w (0,0).
 
     Używa istniejącej ścieżki show_pdf_page (identyczny render jak dawniej),
-    ale TYLKO raz na unikalną sygnaturę."""
+    ale TYLKO raz na unikalną sygnaturę. Z `bleed` stempel jest powiększony
+    o tyle spadu, ile źródło faktycznie ma za kadrem (nie więcej niż żądane);
+    zwraca też ten osiągnięty spad (mm, strony arkusza) do pozycjonowania."""
     cell_w_pt = mm_to_pt(width_mm)
     cell_h_pt = mm_to_pt(height_mm)
     src_page = src[page_index]
     clip_rect = src_page.rect if use_full_page else _centered_clip_rect_pt(
         src_page.rect, content_bbox_pt, width_mm, height_mm, rotation_deg,
     )
+    target = _fit_target_rect(clip_rect, cell_w_pt, cell_h_pt, rotation_deg)
+    got: Bleed = NO_BLEED
+    if any(bleed):
+        sl, st, sr, sb = (mm_to_pt(v) for v in _src_sides_from_dest(bleed, rotation_deg))
+        page_r = src_page.rect
+        grown = fitz.Rect(
+            max(page_r.x0, clip_rect.x0 - sl), max(page_r.y0, clip_rect.y0 - st),
+            min(page_r.x1, clip_rect.x1 + sr), min(page_r.y1, clip_rect.y1 + sb),
+        )
+        src_got = (clip_rect.x0 - grown.x0, clip_rect.y0 - grown.y0,
+                   grown.x1 - clip_rect.x1, grown.y1 - clip_rect.y1)
+        gl, gt, gr, gb = _dest_sides_from_src(src_got, rotation_deg)
+        got = tuple(v / POINTS_PER_MM for v in (gl, gt, gr, gb))
+        clip_rect = grown
+        # nowy stempel zaczyna się od spadu ⇒ kadr nominalny przesuwa się o (gl, gt)
+        target = fitz.Rect(target.x0, target.y0, target.x1 + gl + gr, target.y1 + gt + gb)
+        cell_w_pt += gl + gr
+        cell_h_pt += gt + gb
     with fitz.open() as stamp:
         page = stamp.new_page(width=cell_w_pt, height=cell_h_pt)
-        target = _fit_target_rect(clip_rect, cell_w_pt, cell_h_pt, rotation_deg)
         page.show_pdf_page(target, src, page_index, rotate=rotation_deg, clip=clip_rect)
-        return stamp.tobytes()
+        return stamp.tobytes(), got
 
 
 def _stamp_placements_pikepdf(
     base_pdf_bytes: bytes,
     sheet_height_mm: float,
-    stamp_bytes_by_sig: dict[tuple, bytes],
+    stamp_bytes_by_sig: dict[tuple, tuple[bytes, Bleed]],
     placements_with_sig: list[tuple[Placement, tuple]],
 ) -> bytes:
     """Na stronę bazową (krata/puste, bez OPOS) nakłada stemple przez overlay.
 
     Konwersja układu współrzędnych: nasze mm mają origin w LEWYM-GÓRNYM rogu,
-    PDF w LEWYM-DOLNYM → odbicie osi Y."""
+    PDF w LEWYM-DOLNYM → odbicie osi Y. Stempel ze spadem jest większy od
+    komórki o osiągnięty spad — prostokąt rozszerzamy o tyle samo."""
     sheet_h_pt = mm_to_pt(sheet_height_mm)
     base = pikepdf.Pdf.open(BytesIO(base_pdf_bytes))
     target_page = base.pages[0]
@@ -182,13 +273,14 @@ def _stamp_placements_pikepdf(
     try:
         for placement, sig in placements_with_sig:
             sp = stamp_pdfs.get(sig)
+            stamp_bytes, (bl, bt, br, bb) = stamp_bytes_by_sig[sig]
             if sp is None:
-                sp = pikepdf.Pdf.open(BytesIO(stamp_bytes_by_sig[sig]))
+                sp = pikepdf.Pdf.open(BytesIO(stamp_bytes))
                 stamp_pdfs[sig] = sp
-            x0 = mm_to_pt(placement.x_mm)
-            w = mm_to_pt(placement.width_mm)
-            h = mm_to_pt(placement.height_mm)
-            y_top = mm_to_pt(placement.y_mm)
+            x0 = mm_to_pt(placement.x_mm - bl)
+            w = mm_to_pt(placement.width_mm + bl + br)
+            h = mm_to_pt(placement.height_mm + bt + bb)
+            y_top = mm_to_pt(placement.y_mm - bt)
             lly = sheet_h_pt - (y_top + h)
             rect = pikepdf.Rectangle(x0, lly, x0 + w, lly + h)
             target_page.add_overlay(sp.pages[0], rect)
@@ -246,19 +338,24 @@ def generate_output_docs(job: JobSettings, layout: LayoutResult) -> OutputDocs:
 
     # 2) Render unikalnych stempli RAZ + lista (placement, sygnatura).
     sources = _SourceCache()
-    print_stamps: dict[tuple, bytes] = {}
-    cut_stamps: dict[tuple, bytes] = {}
+    print_stamps: dict[tuple, tuple[bytes, Bleed]] = {}
+    cut_stamps: dict[tuple, tuple[bytes, Bleed]] = {}
     print_list: list[tuple[Placement, tuple]] = []
     cut_list: list[tuple[Placement, tuple]] = []
+    # Bez odstępów (krata cięcia, nie tryb specjalny) druk dostaje spad na zewnątrz bloku.
+    if job.generate_cut_grid and not use_special:
+        print_bleeds = _outer_bleed_sides(layout.placements, GAPLESS_OUTER_BLEED_MM)
+    else:
+        print_bleeds = [NO_BLEED] * len(layout.placements)
     try:
-        for placement in layout.placements:
+        for placement, bleed in zip(layout.placements, print_bleeds):
             p_path, p_idx, p_bbox = _resolve_print_source(job, placement)
-            sig = _placement_signature(p_path, p_idx, p_bbox, placement, use_special)
+            sig = _placement_signature(p_path, p_idx, p_bbox, placement, use_special, bleed)
             if sig not in print_stamps:
                 print_stamps[sig] = _render_cell_stamp(
                     sources.get(p_path), p_idx, p_bbox,
                     placement.width_mm, placement.height_mm,
-                    placement.rotation_deg, use_special,
+                    placement.rotation_deg, use_special, bleed,
                 )
             print_list.append((placement, sig))
 

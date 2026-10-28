@@ -203,9 +203,104 @@ def test_stamp_does_not_stretch_source_when_cell_larger_than_page():
     content_bbox = (0.0, 0.0, side, side)
 
     # kafel 46x46 mm (strona 40 + 3mm marginesu z każdej strony)
-    stamp = _render_cell_stamp(src, 0, content_bbox, 46.0, 46.0, 0, False)
+    stamp, _ = _render_cell_stamp(src, 0, content_bbox, 46.0, 46.0, 0, False)
     w_mm, h_mm = _stamp_content_size_mm(stamp)
 
     # druk ma zostać w skali 1:1 (~40mm), NIE rozdmuchany do ~46mm
     assert w_mm == pytest.approx(40.0, abs=1.5), f"druk rozciągnięty w poziomie: {w_mm:.2f} mm"
     assert h_mm == pytest.approx(40.0, abs=1.5), f"druk rozciągnięty w pionie: {h_mm:.2f} mm"
+
+
+# --- Tryb bez odstępów: spad na zewnątrz bloku -------------------------------
+
+def _bleed_source(tmp_path: Path, w_mm: float, h_mm: float) -> str:
+    """Strona w×h cała czerwona (tło ze spadem) z niebieskim kwadratem 4 mm w środku."""
+    doc = fitz.open()
+    page = doc.new_page(width=w_mm * PT, height=h_mm * PT)
+    page.draw_rect(page.rect, color=None, fill=(1, 0, 0))
+    cx, cy = page.rect.width / 2, page.rect.height / 2
+    page.draw_rect(fitz.Rect(cx - 2 * PT, cy - 2 * PT, cx + 2 * PT, cy + 2 * PT), color=None, fill=(0, 0, 1))
+    path = tmp_path / f"bleed_{w_mm}x{h_mm}.pdf"
+    doc.save(path)
+    doc.close()
+    return str(path)
+
+
+def _gapless_job(source: str, page_mm: tuple[float, float], item_mm: tuple[float, float],
+                 forced_rotation: int | None = None) -> JobSettings:
+    w_pt, h_pt = page_mm[0] * PT, page_mm[1] * PT
+    bbox = (0.0, 0.0, w_pt, h_pt)
+    return JobSettings(
+        print_page=SelectedPage(source, 0), cut_page=SelectedPage(source, 0),
+        print_page_size_mm=page_mm, cut_page_size_mm=page_mm,
+        print_content_size_mm=page_mm, cut_content_size_mm=page_mm,
+        print_content_bbox_pt=bbox, cut_content_bbox_pt=bbox,
+        sheet_spec=SheetSpec(330, 480),
+        item_spec=ItemSpec(item_mm[0], item_mm[1], forced_rotation is not None,
+                           forced_rotation_deg=forced_rotation),
+        gap_enabled=False, gap_mm=0.0, generate_cut_grid=True,
+    )
+
+
+def _px(pix: fitz.Pixmap, x_mm: float, y_mm: float, dpi: int) -> tuple:
+    s = dpi / 25.4
+    return pix.pixel(int(round(x_mm * s)), int(round(y_mm * s)))
+
+
+RED, BLUE, WHITE = (255, 0, 0), (0, 0, 255), (255, 255, 255)
+
+
+@pytest.mark.parametrize("forced_rotation,item_mm", [(None, (30.0, 30.0)), (90, (30.0, 20.0))])
+def test_gapless_print_has_outer_bleed_only(tmp_path, forced_rotation, item_mm):
+    """Bez odstępów skrajne użytki dostają 1 mm spadu TYLKO na zewnątrz bloku;
+    w środku bloku grafika dalej przycięta 1:1, a środek użytku na środku kafla
+    (także przy obrocie 90°)."""
+    page_mm = (item_mm[0] + 6, item_mm[1] + 6)  # plik ma 3 mm spadu z każdej strony
+    src = _bleed_source(tmp_path, *page_mm)
+    job = _gapless_job(src, page_mm, item_mm, forced_rotation)
+    layout = compute_layout(job)
+    assert layout.count >= 4
+    if forced_rotation:
+        assert all(p.rotation_deg == 90 for p in layout.placements)
+    xs0 = min(p.x_mm for p in layout.placements)
+    ys0 = min(p.y_mm for p in layout.placements)
+    xs1 = max(p.x_mm + p.width_mm for p in layout.placements)
+    ys1 = max(p.y_mm + p.height_mm for p in layout.placements)
+    dpi = 150
+    docs = E.generate_output_docs(job, layout)
+    try:
+        pix = docs.print_doc[0].get_pixmap(dpi=dpi)
+    finally:
+        docs.print_doc.close()
+        docs.cut_doc.close()
+    midy = (ys0 + ys1) / 2
+    midx = (xs0 + xs1) / 2
+    # 0,5 mm na zewnątrz każdej krawędzi bloku = spad (czerwony)
+    assert _px(pix, xs0 - 0.5, midy, dpi) == RED
+    assert _px(pix, xs1 + 0.5, midy, dpi) == RED
+    assert _px(pix, midx, ys0 - 0.5, dpi) == RED
+    assert _px(pix, midx, ys1 + 0.5, dpi) == RED
+    # 2 mm na zewnątrz = już nic (spad tylko 1 mm)
+    assert _px(pix, xs0 - 2, midy, dpi) == WHITE
+    assert _px(pix, xs1 + 2, midy, dpi) == WHITE
+    # każdy użytek: niebieski środek dokładnie na środku kafla
+    for p in layout.placements:
+        assert _px(pix, p.x_mm + p.width_mm / 2, p.y_mm + p.height_mm / 2, dpi) == BLUE
+        assert _px(pix, p.x_mm + p.width_mm / 2 + 2.6, p.y_mm + p.height_mm / 2, dpi) == RED
+
+
+def test_gap_mode_print_has_no_bleed(tmp_path):
+    """Tryb z odstępami bez zmian — żadnego spadu poza kaflem."""
+    src = _bleed_source(tmp_path, 36, 36)
+    job = _gapless_job(src, (36, 36), (30, 30))
+    job.gap_enabled, job.gap_mm, job.generate_cut_grid = True, 3.0, False
+    layout = compute_layout(job)
+    p = layout.placements[0]
+    dpi = 150
+    docs = E.generate_output_docs(job, layout)
+    try:
+        pix = docs.print_doc[0].get_pixmap(dpi=dpi)
+    finally:
+        docs.print_doc.close()
+        docs.cut_doc.close()
+    assert _px(pix, p.x_mm - 0.5, p.y_mm + p.height_mm / 2, dpi) == WHITE
